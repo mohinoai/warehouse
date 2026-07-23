@@ -95,7 +95,10 @@ export async function loginAction(
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { error: "Email atau password salah." };
+  if (error) {
+    await supabase.auth.signOut({ scope: "local" });
+    return { error: "Email atau password salah." };
+  }
   redirect("/");
 }
 

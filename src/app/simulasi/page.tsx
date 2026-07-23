@@ -85,7 +85,10 @@ function SimulatorScreen() {
     if (draftAction === "CREATE") {
       const qty = Number(newQty);
       const orderId = `${channel === "SHOPEE" ? "SHP" : "TT"}-260718-${String(state.nextSequence).padStart(3, "0")}`;
-      return makeEvent("ORDER_CREATED", { items: [{ productId: newProductId, qty }] }, orderId);
+      const items = Number.isInteger(qty) && qty > 0
+        ? Array.from({ length: qty }, () => ({ productId: newProductId, qty: 1 }))
+        : [];
+      return makeEvent("ORDER_CREATED", { items }, orderId);
     }
     if (!selected) return null;
     if (draftAction === "SHIP") return makeEvent("ORDER_SHIPPED", {}, selected.id);
@@ -133,6 +136,8 @@ function SimulatorScreen() {
   const draftError =
     draftAction === "CREATE" && (!Number.isInteger(Number(newQty)) || Number(newQty) <= 0)
       ? "Qty order harus bilangan bulat positif."
+      : draftAction === "CREATE" && Number(newQty) > 100
+        ? "Maksimal 100 line item per event simulator."
       : draftAction === "SHIP" && shipmentShortage > 0
         ? `Shipment diblokir: kurang ${shipmentShortage} unit valid.`
         : (draftAction === "CANCEL" || draftAction === "RETURN") &&
@@ -176,12 +181,12 @@ function SimulatorScreen() {
               })}
             </div>
             {draftAction === "CREATE" ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_90px]"><label className="text-[10.5px] font-medium text-muted">Produk<select value={newProductId} onChange={(event) => setNewProductId(event.target.value)} className={`${inputClass} mt-1.5 text-ink`}>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label><label className="text-[10.5px] font-medium text-muted">Qty<input type="number" min={1} step={1} value={newQty} onChange={(event) => setNewQty(event.target.value)} className={`${inputClass} mt-1.5 text-right font-mono text-ink`} /></label></div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_90px]"><label className="text-[10.5px] font-medium text-muted">Produk<select value={newProductId} onChange={(event) => setNewProductId(event.target.value)} className={`${inputClass} mt-1.5 text-ink`}>{products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label><label className="text-[10.5px] font-medium text-muted">Qty<input type="number" min={1} max={100} step={1} value={newQty} onChange={(event) => setNewQty(event.target.value)} className={`${inputClass} mt-1.5 text-right font-mono text-ink`} /></label></div>
             ) : selected ? (
               <div className="mt-4">
                 <div className="rounded-md bg-line-2 px-3 py-2.5"><strong className="font-mono text-[11.5px]">{selected.id}</strong><div className="text-[10.5px] text-muted">{selected.channel} · {selected.status}</div></div>
                 {draftAction === "CANCEL" || draftAction === "RETURN" ? (
-                  <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_90px]"><label className="text-[10.5px] font-medium text-muted">Item<select value={selectedItem?.id ?? ""} onChange={(event) => setActionItemId(event.target.value)} className={`${inputClass} mt-1.5 text-ink`}>{selected.items.map((item) => <option key={item.id} value={item.id}>{state.products.find((product) => product.id === item.productId)?.name}</option>)}</select></label><label className="text-[10.5px] font-medium text-muted">Qty parsial<input type="number" min={1} step={1} value={actionQty} onChange={(event) => setActionQty(event.target.value)} className={`${inputClass} mt-1.5 text-right font-mono text-ink`} /></label></div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_90px]"><label className="text-[10.5px] font-medium text-muted">Item<select value={selectedItem?.id ?? ""} onChange={(event) => setActionItemId(event.target.value)} className={`${inputClass} mt-1.5 text-ink`}>{selected.items.map((item) => <option key={item.id} value={item.id}>{item.id} · {state.products.find((product) => product.id === item.productId)?.name}</option>)}</select></label><label className="text-[10.5px] font-medium text-muted">Qty parsial<input type="number" min={1} step={1} value={actionQty} onChange={(event) => setActionQty(event.target.value)} className={`${inputClass} mt-1.5 text-right font-mono text-ink`} /></label></div>
                 ) : null}
               </div>
             ) : null}
@@ -211,7 +216,8 @@ function SimulatorScreen() {
               <div className="divide-y divide-line-2">
                 {selected.items.map((item) => {
                   const product = state.products.find((candidate) => candidate.id === item.productId);
-                  return <div key={item.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><strong className="text-[12px]">{product?.name}</strong><div className="mt-1 font-mono text-[9.5px] text-muted">{item.id}{item.recipeVersionId ? ` · ${item.recipeVersionId}` : ""}</div></div>{product?.isBundle ? <PillRect tone="amber">BUNDLE SNAPSHOT</PillRect> : null}</div><div className="mt-3 grid grid-cols-5 gap-2 text-center"><div><SectionLabel>Ordered</SectionLabel><strong className="font-mono">{item.orderedQty}</strong></div><div><SectionLabel>Reserved</SectionLabel><strong className="font-mono">{item.reservedQty}</strong></div><div><SectionLabel>Shipped</SectionLabel><strong className="font-mono">{item.shippedQty}</strong></div><div><SectionLabel>Cancelled</SectionLabel><strong className="font-mono">{item.cancelledQty}</strong></div><div><SectionLabel>Returned</SectionLabel><strong className="font-mono">{item.returnedQty}</strong></div></div>{item.componentSnapshot ? <div className="mt-3 text-[10.5px] text-muted">Dipecah: {item.componentSnapshot.map((component) => `${state.products.find((candidate) => candidate.id === component.productId)?.name} ×${component.qty}`).join(" · ")}</div> : null}</div>;
+                  const itemStatus = item.returnedQty > 0 ? "RETURNED" : item.cancelledQty > 0 ? "CANCELLED" : "UNAFFECTED";
+                  return <div key={item.id} className="p-4"><div className="flex items-start justify-between gap-3"><div><strong className="text-[12px]">{product?.name}</strong><div className="mt-1 font-mono text-[9.5px] text-muted">{item.id}{item.recipeVersionId ? ` · ${item.recipeVersionId}` : ""}</div></div><div className="flex flex-wrap justify-end gap-2">{product?.isBundle ? <PillRect tone="amber">BUNDLE SNAPSHOT</PillRect> : null}<PillRect tone={itemStatus === "UNAFFECTED" ? "neutral" : itemStatus === "RETURNED" ? "amber" : "red"}>{itemStatus}</PillRect></div></div><div className="mt-3 grid grid-cols-5 gap-2 text-center"><div><SectionLabel>Ordered</SectionLabel><strong className="font-mono">{item.orderedQty}</strong></div><div><SectionLabel>Reserved</SectionLabel><strong className="font-mono">{item.reservedQty}</strong></div><div><SectionLabel>Shipped</SectionLabel><strong className="font-mono">{item.shippedQty}</strong></div><div><SectionLabel>Cancelled</SectionLabel><strong className="font-mono">{item.cancelledQty}</strong></div><div><SectionLabel>Returned</SectionLabel><strong className="font-mono">{item.returnedQty}</strong></div></div>{item.componentSnapshot ? <div className="mt-3 text-[10.5px] text-muted">Dipecah: {item.componentSnapshot.map((component) => `${state.products.find((candidate) => candidate.id === component.productId)?.name} ×${component.qty}`).join(" · ")}</div> : null}</div>;
                 })}
               </div>
               <div className="grid grid-cols-3 gap-2 border-t border-line-2 bg-canvas p-4 text-center"><div><SectionLabel>On-hand item</SectionLabel><strong className="font-mono">{selectedItem ? productOnHand(state, selectedItem.productId) : "—"}</strong></div><div><SectionLabel>Reserved</SectionLabel><strong className="font-mono text-amber">{selectedItem ? productReserved(state, selectedItem.productId) : "—"}</strong></div><div><SectionLabel>Sellable</SectionLabel><strong className="font-mono text-green">{selectedItem ? productSellable(state, selectedItem.productId) : "—"}</strong></div></div>

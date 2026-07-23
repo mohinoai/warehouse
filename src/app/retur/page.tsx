@@ -22,7 +22,10 @@ function ReturnScreen() {
   const params = useSearchParams();
   const router = useRouter();
   const deepLinked = state.returns.find((item) => item.id === params.get("return"));
-  const [selectedId, setSelectedId] = useState(deepLinked?.id ?? state.returns[0]?.id ?? "");
+  const firstPendingReturn = state.returns.find((returnCase) =>
+    returnCase.items.some((item) => !item.condition),
+  );
+  const [selectedId, setSelectedId] = useState(deepLinked?.id ?? firstPendingReturn?.id ?? state.returns[0]?.id ?? "");
   const selected = state.returns.find((item) => item.id === selectedId) ?? state.returns[0];
   const firstPending = selected?.items.find((item) => !item.condition);
   const [itemId, setItemId] = useState(firstPending?.id ?? selected?.items[0]?.id ?? "");
@@ -152,7 +155,7 @@ function ReturnScreen() {
                     ["SELLABLE", "Layak Jual", "Batch retur baru + ledger"],
                     ["DAMAGED", "Rusak", "Claim/loss, tanpa ledger"],
                     ["LOST", "Hilang", "Claim terpisah, tanpa ledger"],
-                  ] as Array<[ReturnCondition, string, string]>).map(([value, label, description]) => <button key={value} onClick={() => setCondition(value)} className={`min-h-20 rounded-md border p-3 text-left ${condition === value ? "border-green bg-green-soft" : "border-line"}`}><strong className="text-[12px]">{label}</strong><span className="mt-1 block text-[10px] text-muted">{description}</span></button>)}</div></fieldset>
+                  ] as Array<[ReturnCondition, string, string]>).map(([value, label, description]) => <button key={value} onClick={() => setCondition(value)} className={`min-h-20 rounded-md border p-3 text-left ${condition === value ? "border-green bg-green-soft" : "border-line"}`}><strong className="text-[12px]">{label}</strong><span className="mt-1 block font-mono text-[9.5px] text-muted">{value}</span><span className="mt-1 block text-[10px] text-muted">{description}</span></button>)}</div></fieldset>
                   {condition === "SELLABLE" ? <div className="grid gap-3 sm:grid-cols-2"><label className="text-[10.5px] font-medium text-muted">Kode batch retur baru<input value={batchCode} onChange={(event) => setBatchCode(event.target.value)} className={`${inputClass} mt-1.5 font-mono text-ink`} /></label><label className="text-[10.5px] font-medium text-muted">Expiry terverifikasi<input type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} className={`${inputClass} mt-1.5 text-ink`} /></label></div> : null}
                   {condition === "DAMAGED" || condition === "LOST" ? <label className="block text-[10.5px] font-medium text-muted">Evidence reference<input value={evidence} onChange={(event) => setEvidence(event.target.value)} placeholder="Foto/drive/tiket marketplace" className={`${inputClass} mt-1.5 text-ink`} /></label> : null}
                   <label className="block text-[10.5px] font-medium text-muted">Catatan inspeksi<textarea value={note} onChange={(event) => setNote(event.target.value)} className="mt-1.5 min-h-24 w-full rounded-md border border-line bg-surface p-3 text-[12px] text-ink outline-none focus:border-green" placeholder="Kondisi fisik, kemasan, dan hasil inspeksi…" /></label>

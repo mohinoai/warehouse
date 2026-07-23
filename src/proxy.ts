@@ -1,10 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getSupabaseConfig } from "@/lib/supabase/env";
+import { getSupabaseConfig, isDemoModeEnabled } from "@/lib/supabase/env";
 
 export async function proxy(request: NextRequest) {
   const config = getSupabaseConfig();
-  if (!config) return NextResponse.next({ request });
+  const onLogin = request.nextUrl.pathname === "/login";
+  if (!config) {
+    if (isDemoModeEnabled() || onLogin) return NextResponse.next({ request });
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(config.url, config.publishableKey, {
@@ -25,7 +32,6 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getClaims();
   const loggedIn = Boolean(data?.claims);
-  const onLogin = request.nextUrl.pathname === "/login";
 
   if (!loggedIn && !onLogin) {
     const url = request.nextUrl.clone();
@@ -33,10 +39,6 @@ export async function proxy(request: NextRequest) {
     url.search = "";
     return NextResponse.redirect(url);
   }
-  if (loggedIn && onLogin) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
   response.headers.set("Cache-Control", "private, no-store");
   return response;
 }

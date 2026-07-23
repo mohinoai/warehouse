@@ -256,7 +256,7 @@ export default function MasukPage() {
                   <SectionLabel>{mode === "OPENING" ? "Opening balance baru" : "Penerimaan maklon baru"}</SectionLabel>
                   {mode === "OPENING" ? <p className="mt-2 rounded-md bg-amber-soft px-3 py-2 text-[11.5px] text-amber">Akan berstatus Belum Terverifikasi sampai opname pertama selesai.</p> : null}
                 </div>
-                <label className="block text-[11px] font-medium text-muted">Produk<select value={productId} onChange={(event) => setProductId(event.target.value)} className={`${inputClass} mt-1.5`}>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.sku}</option>)}</select></label>
+                <label className="block text-[11px] font-medium text-muted">Produk<select value={productId} onChange={(event) => setProductId(event.target.value)} className={`${inputClass} mt-1.5`}><option value="">Pilih produk</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.sku}</option>)}</select></label>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="text-[11px] font-medium text-muted">Kode batch<input value={batchCode} onChange={(event) => setBatchCode(event.target.value)} className={`${inputClass} mt-1.5 font-mono`} /></label>
                   <label className="text-[11px] font-medium text-muted">Jumlah<input type="number" min={1} step={1} value={qty} onChange={(event) => setQty(event.target.value)} className={`${inputClass} mt-1.5 text-right font-mono`} /></label>

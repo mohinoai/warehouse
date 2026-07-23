@@ -20,12 +20,28 @@ select pg_catalog.set_config(
 );
 select public.bootstrap_demo();
 
-select plan(19);
+select plan(21);
 
 select has_function('public', 'execute_command', array['jsonb'], 'command RPC tersedia');
 select has_function('public', 'get_app_state', array[]::text[], 'state RPC tersedia');
 select ok((select count(*) > 0 from public.products), 'bootstrap membuat produk');
 select ok((select count(*) > 0 from public.stock_ledger), 'bootstrap membuat ledger');
+create temporary table create_opname_result as
+select public.execute_command('{"type":"CREATE_OPNAME"}'::jsonb) as result;
+select is(
+  (select result ->> 'status' from create_opname_result),
+  'PROCESSED',
+  'sesi opname baru dapat dibuat saat draft lain aktif'
+);
+select is(
+  (select count(*) from public.opname_sessions where status = 'DRAFT'),
+  2::bigint,
+  'sesi opname baru dipersist bersama draft yang sudah ada'
+);
+delete from public.opname_counts
+where session_id = (select result ->> 'entityId' from create_opname_result);
+delete from public.opname_sessions
+where id = (select result ->> 'entityId' from create_opname_result);
 select is(
   (select count(*) from (
     select b.id

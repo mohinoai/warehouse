@@ -11,7 +11,7 @@ npm run dev
 
 Buka `http://localhost:3000`.
 
-Tanpa environment variable Supabase, aplikasi memakai shared demo store lokal. Dengan konfigurasi Supabase, seluruh baca/tulis beralih ke backend persisten.
+Tanpa environment variable Supabase, development memakai shared demo store lokal. Production gagal tertutup ke halaman login kecuali `ALLOW_DEMO_MODE=true` diaktifkan secara eksplisit. Dengan konfigurasi Supabase, seluruh baca/tulis beralih ke backend persisten.
 
 ## Menjalankan backend lokal
 

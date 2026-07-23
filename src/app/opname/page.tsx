@@ -35,6 +35,7 @@ function OpnameScreen() {
   const [exceptions, setExceptions] = useState<Record<string, string>>(() => exceptionsFromSession(initial));
   const [previewOpen, setPreviewOpen] = useState(false);
   const [lastResult, setLastResult] = useState("");
+  const [creating, setCreating] = useState(false);
 
   function chooseSession(id: string) {
     const session = state.opnameSessions.find((item) => item.id === id);
@@ -89,17 +90,23 @@ function OpnameScreen() {
   }
 
   async function createSession() {
-    const result = await execute({ type: "CREATE_OPNAME" });
-    toast({ title: result.title, description: result.description, tone: result.ok ? "success" : "error" });
-    if (result.ok && result.entityId) {
-      setSelectedId(result.entityId);
-      setValues({});
-      setExceptions({});
-      router.replace(`/opname?session=${result.entityId}`);
+    if (creating) return;
+    setCreating(true);
+    try {
+      const result = await execute({ type: "CREATE_OPNAME" });
+      toast({ title: result.title, description: result.description, tone: result.ok ? "success" : "error" });
+      if (result.ok && result.entityId) {
+        setSelectedId(result.entityId);
+        setValues({});
+        setExceptions({});
+        router.replace(`/opname?session=${result.entityId}`);
+      }
+    } finally {
+      setCreating(false);
     }
   }
 
-  if (!selected) return <section className="p-7"><Card><EmptyState title="Belum ada sesi opname" action={<button onClick={createSession} className="min-h-11 rounded-md bg-green px-4 text-[12px] font-medium text-white">Sesi Opname Baru</button>} /></Card></section>;
+  if (!selected) return <section className="p-7"><Card><EmptyState title="Belum ada sesi opname" action={<button onClick={createSession} disabled={creating} aria-busy={creating} className="min-h-11 rounded-md bg-green px-4 text-[12px] font-medium text-white disabled:cursor-wait disabled:opacity-60">{creating ? "Membuat sesi…" : "Sesi Opname Baru"}</button>} /></Card></section>;
 
   const counted = selected.counts.filter((count) => values[count.batchId] !== "" || exceptions[count.batchId]).length;
   const previewRows = selected.counts
@@ -110,7 +117,7 @@ function OpnameScreen() {
 
   return (
     <section className="mx-auto max-w-[1720px] animate-fade-in px-4 py-6 sm:px-7">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-[17px] font-medium">Stok Opname</h2><p className="mt-0.5 text-[12px] text-muted">Hitung fisik per batch, preview koreksi, lalu kunci sesi.</p></div><button onClick={createSession} className="min-h-11 rounded-md bg-green px-4 text-[12.5px] font-medium text-white">Sesi Opname Baru</button></div>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-[17px] font-medium">Stok Opname</h2><p className="mt-0.5 text-[12px] text-muted">Hitung fisik per batch, preview koreksi, lalu kunci sesi.</p></div><button onClick={createSession} disabled={creating} aria-busy={creating} className="min-h-11 rounded-md bg-green px-4 text-[12.5px] font-medium text-white disabled:cursor-wait disabled:opacity-60">{creating ? "Membuat sesi…" : "Sesi Opname Baru"}</button></div>
       {lastResult ? <div className="mb-4"><SuccessPanel>{lastResult}</SuccessPanel></div> : null}
       <div className="grid grid-cols-12 gap-4">
         <Card className="col-span-12 h-fit overflow-hidden lg:col-span-3">

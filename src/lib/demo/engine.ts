@@ -797,7 +797,9 @@ export function applyCommand(
       }
     }
   } else if (command.type === "RECEIVE_STOCK") {
+    const product = state.products.find((item) => item.id === command.productId && !item.isBundle);
     if (
+      !product ||
       !Number.isInteger(command.qty) ||
       command.qty <= 0 ||
       !command.batchCode.trim() ||
@@ -887,27 +889,22 @@ export function applyCommand(
       );
     }
   } else if (command.type === "CREATE_OPNAME") {
-    const active = state.opnameSessions.find((session) => session.status === "DRAFT");
-    if (active) {
-      result = rejected("Masih ada sesi aktif", `${active.id} harus difinalisasi terlebih dahulu.`);
-    } else {
-      const id = nextId(state, "opn");
-      state.opnameSessions.unshift({
-        id,
-        warehouse: "Gudang Utama",
-        status: "DRAFT",
-        startedAt: state.demoNow,
-        createdBy: state.actor,
-        counts: state.batches.map((batch) => ({
-          batchId: batch.id,
-          systemQty: batchQty(state, batch.id),
-        })),
-        correctionEntryIds: [],
-      });
-      result = processed("Sesi opname baru dibuat", `${id} memiliki ${state.batches.length} batch dalam scope.`, {
-        entityId: id,
-      });
-    }
+    const id = nextId(state, "opn");
+    state.opnameSessions.unshift({
+      id,
+      warehouse: "Gudang Utama",
+      status: "DRAFT",
+      startedAt: state.demoNow,
+      createdBy: state.actor,
+      counts: state.batches.map((batch) => ({
+        batchId: batch.id,
+        systemQty: batchQty(state, batch.id),
+      })),
+      correctionEntryIds: [],
+    });
+    result = processed("Sesi opname baru dibuat", `${id} memiliki ${state.batches.length} batch dalam scope.`, {
+      entityId: id,
+    });
   } else if (command.type === "SAVE_OPNAME_COUNT") {
     const session = state.opnameSessions.find((item) => item.id === command.sessionId);
     const count = session?.counts.find((item) => item.batchId === command.batchId);

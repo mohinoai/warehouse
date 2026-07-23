@@ -122,6 +122,25 @@ describe("demo stock domain", () => {
     expect(second.state.ledgerEntries).toHaveLength(first.state.ledgerEntries.length);
   });
 
+  it("rejects incoming stock without a product", () => {
+    const state = createDemoState();
+    const beforeBatches = state.batches.length;
+    const beforeLedger = state.ledgerEntries.length;
+    const result = applyCommand(state, {
+      type: "RECEIVE_STOCK",
+      mode: "OPENING",
+      productId: "",
+      batchCode: "OPEN-NO-PRODUCT",
+      qty: 1,
+      expiryDate: "2027-02-01",
+      reference: "OPEN-MISSING-PRODUCT",
+    });
+
+    expect(result.result.ok).toBe(false);
+    expect(result.state.batches).toHaveLength(beforeBatches);
+    expect(result.state.ledgerEntries).toHaveLength(beforeLedger);
+  });
+
   it("cancels reservation without ledger and shipped item with reversal", () => {
     const state = createDemoState();
     const before = state.ledgerEntries.length;
@@ -144,6 +163,35 @@ describe("demo stock domain", () => {
     expect(postShipment.result.ok).toBe(true);
     expect(postShipment.state.ledgerEntries[0].reason).toBe("CANCELLATION_REVERSAL");
     expect(postShipment.state.ledgerEntries[0].qtyDelta).toBe(1);
+  });
+
+  it("keeps unaffected order lines visible after a partial cancellation", () => {
+    const state = createDemoState();
+    const orderId = "SHP-TEST-PARTIAL";
+    const created = applyCommand(state, {
+      type: "INJECT_EVENT",
+      event: event(state, "ORDER_CREATED", orderId, {
+        items: Array.from({ length: 5 }, () => ({ productId: "p-sunscreen", qty: 1 })),
+      }),
+    });
+    const cancelled = applyCommand(created.state, {
+      type: "INJECT_EVENT",
+      event: event(created.state, "ORDER_CANCELLED", orderId, {
+        itemId: `${orderId}-item-1`,
+        qty: 1,
+      }),
+    });
+    const order = cancelled.state.orders.find((item) => item.id === orderId);
+
+    expect(order?.items.map((item) => item.id)).toEqual([
+      `${orderId}-item-1`,
+      `${orderId}-item-2`,
+      `${orderId}-item-3`,
+      `${orderId}-item-4`,
+      `${orderId}-item-5`,
+    ]);
+    expect(order?.items[0].cancelledQty).toBe(1);
+    expect(order?.items.slice(1).every((item) => item.cancelledQty === 0)).toBe(true);
   });
 
   it("expands partial bundle return into product units", () => {
@@ -230,6 +278,17 @@ describe("demo stock domain", () => {
     expect(reversal.qtyDelta).toBe(-originalDelta);
     expect(reversal.reversesEntryId).toBe(original.id);
     expect(updatedOriginal?.reversedByEntryId).toBe(reversal.id);
+  });
+
+  it("creates a new opname session while another draft is active", () => {
+    const state = createDemoState();
+    const existingId = state.opnameSessions[0].id;
+    const created = applyCommand(state, { type: "CREATE_OPNAME" });
+
+    expect(created.result.ok).toBe(true);
+    expect(created.result.entityId).not.toBe(existingId);
+    expect(created.state.opnameSessions).toHaveLength(2);
+    expect(created.state.opnameSessions.every((session) => session.status === "DRAFT")).toBe(true);
   });
 
   it("finalizes opname once and verifies opening balance", () => {

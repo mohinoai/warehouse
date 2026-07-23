@@ -11,3 +11,7 @@ export function getSupabaseConfig(): SupabaseConfig | null {
 
   return url && publishableKey ? { url, publishableKey } : null;
 }
+
+export function isDemoModeEnabled(): boolean {
+  return process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_MODE === "true";
+}
