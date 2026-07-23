@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jejak
 
-## Getting Started
+Sistem rekonsiliasi stok brand skincare. Implementasi memakai Next.js 16, React 19, TypeScript, Tailwind CSS 4, dan Supabase/Postgres.
 
-First, run the development server:
+## Menjalankan aplikasi
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Tanpa environment variable Supabase, aplikasi memakai shared demo store lokal. Dengan konfigurasi Supabase, seluruh baca/tulis beralih ke backend persisten.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Menjalankan backend lokal
 
-## Learn More
+Docker wajib tersedia untuk Supabase CLI.
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .env.example .env.local
+npm run db:start
+npm run db:reset
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Salin API URL dan publishable key dari output `supabase start` ke `.env.local`. Buat satu user Admin melalui Supabase Studio, lalu login di `/login`. Login pertama menjalankan bootstrap data demo secara transaksional bila database masih kosong.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Migrasi tersedia di `supabase/migrations/` dan mencakup:
 
-## Deploy on Vercel
+- Auth-only RLS untuk satu role Admin.
+- `stock_ledger` append-only dengan trigger penolak `UPDATE`/`DELETE`.
+- `stock_balance_summary` O(1), diperbarui dalam transaksi ledger.
+- RPC command untuk FEFO row locking, idempotency import, order, retur, klaim, koreksi, opname, bundle, notifikasi, dan rekonsiliasi.
+- `pg_cron` rekonsiliasi harian pukul 00:15 UTC.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Verifikasi
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run test
+npm run lint
+npm run build
+npm run db:test
+```
+
+## Mode demo lokal
+
+- Navigasi antarhalaman mempertahankan perubahan state.
+- Refresh browser mengembalikan seed data.
+- `Reset Demo` tersedia pada sidebar.
+- `Gagalkan berikutnya` menguji failure state operasi permanen berikutnya.
+- Demo clock ditetapkan pada 18 Juli 2026 agar expiry dan H-40 deterministik.
+
+Semua mutasi stok demo menambahkan entry ledger baru dan memperbarui balance summary. Retur rusak atau hilang hanya membuat claim/loss record, tanpa movement ledger kedua.
