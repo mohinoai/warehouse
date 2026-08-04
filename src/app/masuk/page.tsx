@@ -45,7 +45,7 @@ export default function MasukPage() {
   const [mode, setMode] = useState<Mode>("MAKLON");
   const [step, setStep] = useState<"INPUT" | "PREVIEW">("INPUT");
   const [productId, setProductId] = useState(products[0]?.id ?? "");
-  const [batchCode, setBatchCode] = useState("SG-2607-03");
+  const [batchCode, setBatchCode] = useState("");
   const [qty, setQty] = useState("50");
   const [expiry, setExpiry] = useState("2027-07-18");
   const [reference, setReference] = useState("");
@@ -92,8 +92,20 @@ export default function MasukPage() {
     if (result.ok) {
       setLastResult(`${result.title}: ${result.description}`);
       setReference("");
+      setBatchCode("");
+      setStep("INPUT");
+    } else {
+      setError(`${result.title}: ${result.description}`);
       setStep("INPUT");
     }
+  }
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setStep("INPUT");
+    setError("");
+    setReference("");
+    setBatchCode("");
   }
 
   function loadCsv(event: ChangeEvent<HTMLInputElement>) {
@@ -189,11 +201,7 @@ export default function MasukPage() {
           {(["MAKLON", "OPENING", "IMPORT"] as Mode[]).map((item) => (
             <button
               key={item}
-              onClick={() => {
-                setMode(item);
-                setStep("INPUT");
-                setError("");
-              }}
+              onClick={() => switchMode(item)}
               className={`min-h-11 rounded px-3 text-[11.5px] font-medium ${mode === item ? "bg-surface shadow-sm" : "text-muted"}`}
             >
               {item === "MAKLON" ? "Maklon" : item === "OPENING" ? "Opening Stock" : "Import CSV"}
@@ -258,7 +266,7 @@ export default function MasukPage() {
                 </div>
                 <label className="block text-[11px] font-medium text-muted">Produk<select value={productId} onChange={(event) => setProductId(event.target.value)} className={`${inputClass} mt-1.5`}><option value="">Pilih produk</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {product.sku}</option>)}</select></label>
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="text-[11px] font-medium text-muted">Kode batch<input value={batchCode} onChange={(event) => setBatchCode(event.target.value)} className={`${inputClass} mt-1.5 font-mono`} /></label>
+                  <label className="text-[11px] font-medium text-muted">Kode batch<input value={batchCode} onChange={(event) => setBatchCode(event.target.value)} placeholder={mode === "OPENING" ? "SG-OPEN-02" : "SG-2607-03"} className={`${inputClass} mt-1.5 font-mono`} /></label>
                   <label className="text-[11px] font-medium text-muted">Jumlah<input type="number" min={1} step={1} value={qty} onChange={(event) => setQty(event.target.value)} className={`${inputClass} mt-1.5 text-right font-mono`} /></label>
                 </div>
                 <label className="block text-[11px] font-medium text-muted">Tanggal kedaluwarsa<input type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} className={`${inputClass} mt-1.5`} /></label>
@@ -276,6 +284,7 @@ export default function MasukPage() {
                   <div className="flex justify-between gap-3"><span className="text-muted">Dampak</span><strong className="font-mono text-green">+{quantity}</strong></div>
                   <div className="flex justify-between gap-3"><span className="text-muted">On-hand sesudah</span><strong className="font-mono">{before + quantity}</strong></div>
                   <div className="flex justify-between gap-3"><span className="text-muted">Referensi</span><strong className="font-mono">{reference}</strong></div>
+                  <div className="flex justify-between gap-3"><span className="text-muted">Reason / status</span><strong className="font-mono">{mode === "OPENING" ? "OPENING_BALANCE · UNVERIFIED" : "INCOMING_MAKLON · VERIFIED"}</strong></div>
                 </div>
                 <div className="flex gap-2"><button onClick={() => setStep("INPUT")} className="min-h-11 flex-1 rounded-md border border-line text-[12.5px] font-medium">Kembali</button><button onClick={commit} className="min-h-11 flex-1 rounded-md bg-green text-[12.5px] font-medium text-white">Konfirmasi &amp; Tulis Ledger</button></div>
               </div>
