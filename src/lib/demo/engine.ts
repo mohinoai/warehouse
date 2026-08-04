@@ -54,6 +54,20 @@ export function productOnHand(state: DemoState, productId: string): number {
   );
 }
 
+export function shipmentRequest(
+  payload: Record<string, unknown>,
+): Map<string, number> | null {
+  const rows = payload.items;
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const request = new Map<string, number>();
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const { itemId, qty } = row as { itemId?: unknown; qty?: unknown };
+    if (typeof itemId === "string" && itemId) request.set(itemId, Number(qty));
+  }
+  return request.size > 0 ? request : null;
+}
+
 function itemRequirements(item: OrderItem, qty: number): RecipeComponent[] {
   if (item.componentSnapshot?.length) {
     return item.componentSnapshot.map((component) => ({
@@ -345,12 +359,32 @@ function injectEvent(state: DemoState, event: ImportEvent): CommandResult {
     ) {
       return rejected("Shipment tidak dapat diproses", `Status order saat ini ${order.status}.`);
     }
+    const requestedQty = shipmentRequest(event.payload);
+    const plan = new Map<string, number>();
+    for (const item of order.items) {
+      const remaining = item.orderedQty - item.cancelledQty - item.shippedQty;
+      if (repairingMissingLedger) {
+        plan.set(item.id, item.shippedQty);
+        continue;
+      }
+      const requested = requestedQty ? requestedQty.get(item.id) ?? 0 : remaining;
+      if (!Number.isInteger(requested) || requested < 0) {
+        return rejected("Qty shipment tidak valid", `${item.id} harus bilangan bulat nol atau lebih.`);
+      }
+      if (requested > Math.max(0, remaining)) {
+        return rejected("Qty shipment melebihi sisa item", `${item.id} hanya menyisakan ${Math.max(0, remaining)} unit.`);
+      }
+      plan.set(item.id, requested);
+    }
+    const plannedTotal = [...plan.values()].reduce((total, qty) => total + qty, 0);
+    if (!repairingMissingLedger && plannedTotal <= 0) {
+      return rejected("Shipment kosong", "Minimal satu item harus memiliki qty kirim di atas nol.");
+    }
+
     const ledgerIds: string[] = [];
     const allocationGroupId = nextId(state, "alloc");
     for (const item of order.items) {
-      const qtyToShip = repairingMissingLedger
-        ? item.shippedQty
-        : item.orderedQty - item.cancelledQty - item.shippedQty;
+      const qtyToShip = plan.get(item.id) ?? 0;
       if (qtyToShip <= 0) continue;
       const requirements = itemRequirements(item, qtyToShip);
       for (const requirement of requirements) {
@@ -390,12 +424,23 @@ function injectEvent(state: DemoState, event: ImportEvent): CommandResult {
         item.reservedQty = Math.max(0, item.reservedQty - qtyToShip);
       }
     }
-    order.status = order.channel === "SHOPEE" ? "SHIPPED" : "IN_TRANSIT";
+    const outstanding = order.items.reduce(
+      (total, item) => total + Math.max(0, item.orderedQty - item.cancelledQty - item.shippedQty),
+      0,
+    );
+    const shipmentComplete = repairingMissingLedger || outstanding === 0;
+    if (shipmentComplete) {
+      order.status = order.channel === "SHOPEE" ? "SHIPPED" : "IN_TRANSIT";
+    }
     order.updatedAt = event.occurredAt;
     markProcessed();
     return processed(
-      `${order.channel === "SHOPEE" ? "SHIPPED" : "IN_TRANSIT"} diproses`,
-      `${ledgerIds.length} entry ledger dibuat melalui alokasi FEFO.`,
+      shipmentComplete
+        ? `${order.channel === "SHOPEE" ? "SHIPPED" : "IN_TRANSIT"} diproses`
+        : "Shipment parsial diproses",
+      shipmentComplete
+        ? `${ledgerIds.length} entry ledger dibuat melalui alokasi FEFO.`
+        : `${ledgerIds.length} entry ledger dibuat; ${outstanding} unit belum dikirim.`,
       { entityId: order.id, ledgerEntryIds: ledgerIds },
     );
   }

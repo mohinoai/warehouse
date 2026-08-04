@@ -20,6 +20,10 @@ function itemComponents(item: OrderItem, qty: number): RecipeComponent[] {
     : [{ productId: item.productId, qty }];
 }
 
+function remainingQty(item: OrderItem): number {
+  return Math.max(0, item.orderedQty - item.cancelledQty - item.shippedQty);
+}
+
 function statusTone(status: string): "green" | "amber" | "red" | "neutral" {
   if (status === "SHIPPED" || status === "IN_TRANSIT") return "green";
   if (status === "CANCELLED") return "red";
@@ -42,18 +46,34 @@ function SimulatorScreen() {
   const [newQty, setNewQty] = useState("1");
   const [actionItemId, setActionItemId] = useState(selected?.items[0]?.id ?? "");
   const [actionQty, setActionQty] = useState("1");
+  const [shipPlan, setShipPlan] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [lastEvent, setLastEvent] = useState<ImportEvent | null>(null);
   const [lastResult, setLastResult] = useState("");
   const products = state.products;
   const selectedItem = selected?.items.find((item) => item.id === actionItemId) ?? selected?.items[0];
   const actionQuantity = Number(actionQty);
+  const repairingMissingLedger = Boolean(
+    selected &&
+      (selected.status === "SHIPPED" || selected.status === "IN_TRANSIT") &&
+      selected.allocations.length === 0,
+  );
+
+  function planQty(item: OrderItem): number {
+    const raw = shipPlan[item.id];
+    return raw === undefined ? remainingQty(item) : Number(raw);
+  }
+
+  function shipQty(item: OrderItem): number {
+    return repairingMissingLedger ? item.shippedQty : planQty(item);
+  }
 
   function chooseChannel(next: Channel) {
     setChannel(next);
     const first = state.orders.find((order) => order.channel === next);
     setSelectedId(first?.id ?? "");
     setActionItemId(first?.items[0]?.id ?? "");
+    setShipPlan({});
     setDraftAction("CREATE");
     router.replace(first ? `/simulasi?order=${first.id}` : "/simulasi");
   }
@@ -63,6 +83,7 @@ function SimulatorScreen() {
     setSelectedId(orderId);
     setActionItemId(order?.items[0]?.id ?? "");
     setActionQty("1");
+    setShipPlan({});
     setDraftAction("SHIP");
     router.replace(`/simulasi?order=${orderId}`);
   }
@@ -91,7 +112,12 @@ function SimulatorScreen() {
       return makeEvent("ORDER_CREATED", { items }, orderId);
     }
     if (!selected) return null;
-    if (draftAction === "SHIP") return makeEvent("ORDER_SHIPPED", {}, selected.id);
+    if (draftAction === "SHIP") {
+      const payload = repairingMissingLedger
+        ? {}
+        : { items: selected.items.map((item) => ({ itemId: item.id, qty: planQty(item) })) };
+      return makeEvent("ORDER_SHIPPED", payload, selected.id);
+    }
     if (!selectedItem) return null;
     return makeEvent(
       draftAction === "CANCEL" ? "ORDER_CANCELLED" : "RETURN_REQUESTED",
@@ -109,6 +135,7 @@ function SimulatorScreen() {
     setLastEvent(event);
     setLastResult(`${result.status}: ${result.description}`);
     toast({ title: result.title, description: result.description, tone: result.ok ? (result.status === "DUPLICATE" ? "info" : "success") : "error" });
+    if (result.ok && event.type === "ORDER_SHIPPED") setShipPlan({});
     if (result.ok && result.entityId && event.type === "ORDER_CREATED") {
       setSelectedId(result.entityId);
       setActionItemId(`${result.entityId}-item-1`);
@@ -120,24 +147,37 @@ function SimulatorScreen() {
   const draft = currentDraft();
   const shipmentPreview = selected
     ? selected.items.flatMap((item) => {
-        const repairingMissingLedger =
-          (selected.status === "SHIPPED" || selected.status === "IN_TRANSIT") &&
-          selected.allocations.length === 0;
-        const qtyToShip = repairingMissingLedger
-          ? item.shippedQty
-          : item.orderedQty - item.cancelledQty - item.shippedQty;
-        return itemComponents(item, Math.max(0, qtyToShip)).map((requirement) => ({
+        const qtyToShip = shipQty(item);
+        if (!Number.isInteger(qtyToShip) || qtyToShip <= 0) return [];
+        return itemComponents(item, qtyToShip).map((requirement) => ({
           ...requirement,
           preview: previewFefo(state, requirement.productId, requirement.qty),
         }));
       })
     : [];
   const shipmentShortage = shipmentPreview.reduce((total, item) => total + item.preview.shortage, 0);
+  const shipPlanTotal = selected && !repairingMissingLedger
+    ? selected.items.reduce((total, item) => total + (Number.isFinite(planQty(item)) ? planQty(item) : 0), 0)
+    : 0;
+  const shipPlanError = selected && !repairingMissingLedger
+    ? selected.items.find((item) => {
+        const qty = planQty(item);
+        if (!Number.isInteger(qty) || qty < 0) return true;
+        return qty > remainingQty(item);
+      })
+    : undefined;
+  const shipmentOutstanding = selected && !repairingMissingLedger
+    ? selected.items.reduce((total, item) => total + Math.max(0, remainingQty(item) - planQty(item)), 0)
+    : 0;
   const draftError =
     draftAction === "CREATE" && (!Number.isInteger(Number(newQty)) || Number(newQty) <= 0)
       ? "Qty order harus bilangan bulat positif."
       : draftAction === "CREATE" && Number(newQty) > 100
         ? "Maksimal 100 line item per event simulator."
+      : draftAction === "SHIP" && shipPlanError
+        ? `Qty kirim ${shipPlanError.id} harus bilangan bulat 0–${remainingQty(shipPlanError)}.`
+      : draftAction === "SHIP" && !repairingMissingLedger && shipPlanTotal <= 0
+        ? "Minimal satu item harus memiliki qty kirim di atas nol."
       : draftAction === "SHIP" && shipmentShortage > 0
         ? `Shipment diblokir: kurang ${shipmentShortage} unit valid.`
         : (draftAction === "CANCEL" || draftAction === "RETURN") &&
@@ -192,7 +232,51 @@ function SimulatorScreen() {
             ) : null}
             {draftAction === "SHIP" && selected ? (
               <div className="mt-4">
-                <SectionLabel>Preview FEFO</SectionLabel>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <SectionLabel>Qty kirim per item</SectionLabel>
+                  {repairingMissingLedger ? <PillRect tone="amber">REPAIR LEDGER</PillRect> : shipmentOutstanding > 0 ? <PillRect tone="amber">PARSIAL · {shipmentOutstanding} SISA</PillRect> : <PillRect tone="green">KIRIM PENUH</PillRect>}
+                </div>
+                {repairingMissingLedger ? (
+                  <p className="mt-2 rounded-md bg-amber-soft px-3 py-2 text-[11px] text-amber">Order sudah berstatus {selected.status} tanpa allocation; event ini menulis ulang ledger sebesar qty terkirim dan tidak dapat diubah.</p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {selected.items.map((item) => {
+                      const product = state.products.find((candidate) => candidate.id === item.productId);
+                      const remaining = remainingQty(item);
+                      const qty = planQty(item);
+                      const components = Number.isInteger(qty) && qty > 0 ? itemComponents(item, qty) : [];
+                      return (
+                        <div key={item.id} className="rounded-md border border-line px-3 py-2.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <strong className="text-[11.5px]">{product?.name}</strong>
+                              <div className="font-mono text-[9.5px] text-muted">{item.id} · sisa {remaining} dari {item.orderedQty}</div>
+                            </div>
+                            <label className="text-[9.5px] font-medium uppercase tracking-[0.08em] text-muted">
+                              Qty
+                              <input
+                                type="number"
+                                min={0}
+                                max={remaining}
+                                step={1}
+                                value={shipPlan[item.id] ?? String(remaining)}
+                                onChange={(event) => setShipPlan({ ...shipPlan, [item.id]: event.target.value })}
+                                aria-label={`Qty kirim ${item.id}`}
+                                className={`${inputClass} mt-1 w-20 text-right font-mono text-ink`}
+                              />
+                            </label>
+                          </div>
+                          {product?.isBundle && components.length > 0 ? (
+                            <div className="mt-2 border-t border-line-2 pt-2 text-[10px] text-muted">
+                              Komponen: {components.map((component) => `${state.products.find((candidate) => candidate.id === component.productId)?.name} ×${component.qty}`).join(" · ")}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="mt-4"><SectionLabel>Preview FEFO</SectionLabel></div>
                 <div className="mt-2 space-y-2">
                   {shipmentPreview.flatMap((requirement) => requirement.preview.allocations.map((allocation, index) => {
                     const product = state.products.find((item) => item.id === requirement.productId);
@@ -206,7 +290,7 @@ function SimulatorScreen() {
               <pre className="mt-2 overflow-x-auto whitespace-pre-wrap border-t border-line pt-2 font-mono text-[9.5px] text-muted">{JSON.stringify(draft?.payload ?? {}, null, 2)}</pre>
             </div>
             {draftError ? <p role="alert" className="mt-3 rounded-md bg-red-soft px-3 py-2 text-[11.5px] text-red">{draftError}</p> : null}
-            <button disabled={pending || Boolean(draftError) || !draft} onClick={() => inject(draft)} className="mt-4 min-h-11 w-full rounded-md bg-green px-4 text-[12.5px] font-medium text-white disabled:opacity-40">{pending ? "Memproses event…" : draftAction === "SHIP" ? `Konfirmasi ${channel === "SHOPEE" ? "SHIPPED" : "IN_TRANSIT"} & Tulis Ledger` : "Injeksi Event"}</button>
+            <button disabled={pending || Boolean(draftError) || !draft} onClick={() => inject(draft)} className="mt-4 min-h-11 w-full rounded-md bg-green px-4 text-[12.5px] font-medium text-white disabled:opacity-40">{pending ? "Memproses event…" : draftAction !== "SHIP" ? "Injeksi Event" : !repairingMissingLedger && shipmentOutstanding > 0 ? `Kirim Parsial ${shipPlanTotal} Unit & Tulis Ledger` : `Konfirmasi ${channel === "SHOPEE" ? "SHIPPED" : "IN_TRANSIT"} & Tulis Ledger`}</button>
             {lastEvent ? <button onClick={() => inject(lastEvent)} className="mt-2 min-h-11 w-full rounded-md border border-line text-[11.5px] font-medium">Kirim ulang event terakhir · uji duplicate</button> : null}
           </Card>
 

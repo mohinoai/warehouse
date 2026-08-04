@@ -70,6 +70,82 @@ describe("demo stock domain", () => {
     expect(checkInvariants(shipped.state)).toEqual([]);
   });
 
+  it("ships only the requested qty per line and keeps the order open", () => {
+    const state = createDemoState();
+    const partial = applyCommand(state, {
+      type: "INJECT_EVENT",
+      event: event(state, "ORDER_SHIPPED", "SHP-260718-002", {
+        items: [
+          { itemId: "SHP-260718-002-item-1", qty: 1 },
+          { itemId: "SHP-260718-002-item-2", qty: 0 },
+        ],
+      }),
+    });
+    const order = partial.state.orders.find((item) => item.id === "SHP-260718-002");
+
+    expect(partial.result.ok).toBe(true);
+    expect(order?.status).toBe("RESERVED");
+    expect(order?.items[0].shippedQty).toBe(1);
+    expect(order?.items[0].reservedQty).toBe(2);
+    expect(order?.items[1].shippedQty).toBe(0);
+    expect(
+      order?.allocations.reduce((total, allocation) => total + allocation.qty, 0),
+    ).toBe(1);
+    expect(checkInvariants(partial.state)).toEqual([]);
+
+    const rest = applyCommand(partial.state, {
+      type: "INJECT_EVENT",
+      event: {
+        ...event(partial.state, "ORDER_SHIPPED", "SHP-260718-002", {
+          items: [
+            { itemId: "SHP-260718-002-item-1", qty: 2 },
+            { itemId: "SHP-260718-002-item-2", qty: 1 },
+          ],
+        }),
+        idempotencyKey: "test:ORDER_SHIPPED:SHP-260718-002:rest",
+      },
+    });
+    const closed = rest.state.orders.find((item) => item.id === "SHP-260718-002");
+
+    expect(rest.result.ok).toBe(true);
+    expect(closed?.status).toBe("SHIPPED");
+    expect(closed?.items.every((item) => item.shippedQty === item.orderedQty)).toBe(true);
+    expect(checkInvariants(rest.state)).toEqual([]);
+  });
+
+  it("rejects a shipment line above the remaining qty", () => {
+    const state = createDemoState();
+    const ledgerCount = state.ledgerEntries.length;
+    const rejectedShipment = applyCommand(state, {
+      type: "INJECT_EVENT",
+      event: event(state, "ORDER_SHIPPED", "SHP-260718-002", {
+        items: [{ itemId: "SHP-260718-002-item-1", qty: 4 }],
+      }),
+    });
+
+    expect(rejectedShipment.result.ok).toBe(false);
+    expect(rejectedShipment.state.ledgerEntries).toHaveLength(ledgerCount);
+    expect(
+      rejectedShipment.state.orders.find((item) => item.id === "SHP-260718-002")?.status,
+    ).toBe("RESERVED");
+  });
+
+  it("expands bundle components when a bundle line ships partially", () => {
+    const state = createDemoState();
+    const shipped = applyCommand(state, {
+      type: "INJECT_EVENT",
+      event: event(state, "ORDER_SHIPPED", "TT-260718-003", {
+        items: [{ itemId: "TT-260718-003-item-1", qty: 1 }],
+      }),
+    });
+    const order = shipped.state.orders.find((item) => item.id === "TT-260718-003");
+
+    expect(shipped.result.ok).toBe(true);
+    expect(order?.allocations.length).toBeGreaterThan(1);
+    expect(order?.allocations.every((allocation) => allocation.productId !== "p-bundle-glow")).toBe(true);
+    expect(checkInvariants(shipped.state)).toEqual([]);
+  });
+
   it("ignores duplicate event without changing state twice", () => {
     const state = createDemoState();
     const shipment = event(state, "ORDER_SHIPPED", "SHP-260718-002");
