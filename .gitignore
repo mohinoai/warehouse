@@ -42,3 +42,5 @@ yarn-error.log*
 next-env.d.ts
 
 /testsprite_tests/
+
+testsprite_tests/tmp/config.json
