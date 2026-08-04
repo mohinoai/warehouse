@@ -18,6 +18,10 @@ function formatTime(value: string) {
   return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(new Date(value));
 }
 
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(value));
+}
+
 function referenceTarget(type: string, id: string) {
   if (type === "ORDER") return `/simulasi?order=${id}`;
   if (type === "RETURN") return `/retur?return=${id}`;
@@ -84,6 +88,7 @@ function LedgerScreen() {
   }
 
   const selectedBatch = state.batches.find((item) => item.id === selected?.batchId);
+  const expiredBatch = Boolean(selectedBatch && selectedBatch.expiryDate < state.demoNow.slice(0, 10));
   const canCorrect = selected && !selected.reversedByEntryId && selected.reason !== "MANUAL_ENTRY_CORRECTION";
 
   return (
@@ -143,7 +148,8 @@ function LedgerScreen() {
               <div className="border-b border-line-2 p-5"><div className="flex flex-wrap items-start justify-between gap-2"><div><SectionLabel>Detail entry</SectionLabel><h3 className="mt-1 font-mono text-[13px] font-semibold">{selected.id}</h3></div><PillRect tone={selected.qtyDelta > 0 ? "green" : "neutral"}>{selected.reason}</PillRect></div><p className="mt-3 text-[11.5px] text-muted">Dibuat {formatTime(selected.createdAt)} oleh {selected.actor}</p></div>
               <div className="space-y-2 p-5 text-[11.5px]">
                 <div className="flex justify-between gap-3"><span className="text-muted">Produk</span><strong>{selectedProduct?.name}</strong></div>
-                <div className="flex justify-between gap-3"><span className="text-muted">Batch</span><strong className="font-mono">{selectedBatch?.code}</strong></div>
+                <div className="flex justify-between gap-3"><span className="text-muted">Batch</span><strong className="font-mono">{selectedBatch?.code ?? "—"}</strong></div>
+                <div className="flex justify-between gap-3"><span className="text-muted">Expiry batch</span><strong className={`font-mono ${expiredBatch ? "text-red" : ""}`}>{selectedBatch ? formatDate(selectedBatch.expiryDate) : "—"}{expiredBatch ? " · kedaluwarsa" : ""}</strong></div>
                 <div className="flex justify-between gap-3"><span className="text-muted">Reason / channel</span><strong>{selected.reason} / {selected.channel}</strong></div>
                 <div className="flex justify-between gap-3"><span className="text-muted">Qty / saldo after</span><strong className="font-mono">{fmtDelta(selected.qtyDelta)} / {selected.balanceAfter}</strong></div>
                 <div className="flex justify-between gap-3"><span className="text-muted">Reference</span>{referenceTarget(selected.referenceType, selected.referenceId) ? <Link href={referenceTarget(selected.referenceType, selected.referenceId)} className="font-mono font-medium text-green hover:underline">{selected.referenceId} →</Link> : <strong className="font-mono">{selected.referenceId}</strong>}</div>
