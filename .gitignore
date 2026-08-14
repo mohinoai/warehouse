@@ -48,3 +48,4 @@ next-env.d.ts
 /testsprite_tests/
 
 testsprite_tests/tmp/config.json
+testsprite_tests/tmp/
