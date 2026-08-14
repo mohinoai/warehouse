@@ -15,6 +15,32 @@ type DraftAction = "CREATE" | "SHIP" | "CANCEL" | "RETURN";
 
 const inputClass = "min-h-[44px] w-full rounded-lg border border-black/[0.1] bg-black/[0.015] px-3.5 text-[13px] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-all duration-200 focus:border-[#6cc795] focus:bg-white focus:ring-[3px] focus:ring-[#6cc795]/20";
 
+// Each marketplace has a distinct stock rule: Shopee deducts on SHIPPED, TikTok
+// on IN_TRANSIT and carries a 40-day return-claim window. Give them separate
+// color identities so switching channel is visibly different, not just a label.
+const CHANNEL_THEME: Record<Channel, {
+  active: string;
+  dot: string;
+  strip: string;
+  shipStatus: string;
+  rule: string;
+}> = {
+  SHOPEE: {
+    active: "bg-[#fff3ed] text-[#d9480f] shadow-[0_1px_4px_rgba(217,72,15,0.18)]",
+    dot: "bg-[#ee5a29]",
+    strip: "border-[#ee5a29]/25 bg-[#fff6f0] text-[#c2410c]",
+    shipStatus: "SHIPPED",
+    rule: "Stok terpotong saat SHIPPED. Tanpa jendela klaim retur khusus.",
+  },
+  TIKTOK: {
+    active: "bg-[#fff1f2] text-[#be123c] shadow-[0_1px_4px_rgba(190,18,60,0.18)]",
+    dot: "bg-[#f43f5e]",
+    strip: "border-[#f43f5e]/25 bg-[#fff5f6] text-[#be123c]",
+    shipStatus: "IN_TRANSIT",
+    rule: "Stok terpotong saat IN_TRANSIT. Klaim retur H-40 sejak retur diajukan.",
+  },
+};
+
 function itemComponents(item: OrderItem, qty: number): RecipeComponent[] {
   return item.componentSnapshot?.length
     ? item.componentSnapshot.map((component) => ({ productId: component.productId, qty: component.qty * qty }))
@@ -198,21 +224,29 @@ function SimulatorScreen() {
             <button
               key={item}
               onClick={() => chooseChannel(item)}
-              className={`min-h-[40px] rounded-md px-5 text-[11.5px] font-semibold tracking-wide uppercase transition-all duration-200 ${
-                channel === item ? "bg-white text-ink shadow-[0_1px_4px_rgba(0,0,0,0.06)]" : "text-muted hover:text-ink-2"
+              className={`flex min-h-[40px] items-center gap-2 rounded-md px-5 text-[11.5px] font-semibold tracking-wide uppercase transition-all duration-200 ${
+                channel === item ? CHANNEL_THEME[item].active : "text-muted hover:text-ink-2"
               }`}
             >
+              <span className={`size-1.5 rounded-full ${channel === item ? CHANNEL_THEME[item].dot : "bg-current opacity-40"}`} />
               {item}
             </button>
           ))}
         </div>
+      </div>
+
+      <div className={`mb-5 flex flex-wrap items-center gap-2.5 rounded-lg border px-4 py-3 text-[12px] font-medium ${CHANNEL_THEME[channel].strip}`}>
+        <span className={`size-2 rounded-full ${CHANNEL_THEME[channel].dot}`} />
+        <strong className="uppercase tracking-wide">{channel}</strong>
+        <span className="opacity-70">·</span>
+        <span>{CHANNEL_THEME[channel].rule}</span>
       </div>
       {lastResult ? <div className="mb-5"><SuccessPanel>{lastResult}</SuccessPanel></div> : null}
 
       <div className="grid grid-cols-12 gap-5">
         <Card className="col-span-12 overflow-hidden xl:col-span-7">
           <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4">
-            <h3 className="text-[14px] font-semibold tracking-tight text-ink">Order {channel}</h3>
+            <h3 className="flex items-center gap-2 text-[14px] font-semibold tracking-tight text-ink"><span className={`size-2 rounded-full ${CHANNEL_THEME[channel].dot}`} />Order {channel}</h3>
             <PillRect>{channelOrders.length} ORDER</PillRect>
           </div>
           {pending ? (
@@ -391,7 +425,7 @@ function SimulatorScreen() {
               ) : !repairingMissingLedger && shipmentOutstanding > 0 ? (
                 `Kirim Parsial ${shipPlanTotal} Unit & Tulis Ledger`
               ) : (
-                `Konfirmasi ${channel === "SHOPEE" ? "SHIPPED" : "IN_TRANSIT"} & Tulis Ledger`
+                `Konfirmasi ${CHANNEL_THEME[channel].shipStatus} & Tulis Ledger`
               )}
             </button>
             {lastEvent ? <button onClick={() => inject(lastEvent)} className="mt-3 min-h-[44px] w-full rounded-[1rem] border border-black/[0.08] bg-transparent text-[12px] font-medium text-muted transition-all hover:bg-black/[0.02] hover:text-ink-2">Kirim ulang event terakhir · uji duplicate</button> : null}
