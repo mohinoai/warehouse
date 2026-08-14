@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fmtShortDate, greetingForHour } from "@/lib/format";
 import { useDemoStore } from "./demo-store-provider";
-import { IconBell, IconMenu, IconPlus, IconSearch } from "./icons";
+import { IconBell, IconInfo, IconMenu, IconPlus, IconSearch } from "./icons";
 import { MovementModal } from "./movement-modal";
 import { NotificationCenter } from "./notification-center";
+import { HelpCenter } from "./help-center";
 import { Dialog } from "./dialog";
 import { useLocalHour } from "./use-local-hour";
 
@@ -25,6 +26,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
   const [modalOpen, setModalOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const { state } = useDemoStore();
@@ -164,6 +166,13 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             <span className="hidden text-[12px] font-medium sm:inline">Aksi Cepat</span>
           </button>
           <button
+            aria-label="Bantuan & panduan"
+            onClick={() => setHelpOpen(true)}
+            className="hidden h-11 w-11 items-center justify-center rounded-md border border-line bg-surface transition-colors hover:bg-line-2 sm:flex"
+          >
+            <IconInfo size={15} />
+          </button>
+          <button
             aria-label="Notifikasi"
             onClick={() => setNotificationsOpen(true)}
             className="relative flex h-11 w-11 items-center justify-center rounded-md border border-line bg-surface transition-colors hover:bg-line-2"
@@ -179,6 +188,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       </div>
       {modalOpen ? <MovementModal onClose={() => setModalOpen(false)} /> : null}
       <NotificationCenter open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+      <HelpCenter open={helpOpen} onClose={() => setHelpOpen(false)} />
       <Dialog
         open={mobileSearchOpen}
         onClose={() => {
@@ -210,6 +220,16 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
             >
               <IconPlus size={14} />
               Stok Keluar
+            </button>
+            <button
+              onClick={() => {
+                setMobileSearchOpen(false);
+                setHelpOpen(true);
+              }}
+              className="col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-md border border-line text-[11.5px] font-medium"
+            >
+              <IconInfo size={14} />
+              Bantuan & Panduan
             </button>
           </div>
           <label className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3">
