@@ -338,6 +338,40 @@ describe("demo stock domain", () => {
     ]);
   });
 
+  it("differentiates claim outcomes: replacement for damaged, blocked for lost", () => {
+    const state = createDemoState();
+    const damaged = applyCommand(state, {
+      type: "INSPECT_RETURN",
+      returnId: "RET-SHP-BUNDLE-01",
+      returnItemId: "RET-SHP-BUNDLE-01-item-1",
+      condition: "DAMAGED",
+      note: "Botol pecah",
+    });
+    const lost = applyCommand(damaged.state, {
+      type: "INSPECT_RETURN",
+      returnId: "RET-SHP-BUNDLE-01",
+      returnItemId: "RET-SHP-BUNDLE-01-item-2",
+      condition: "LOST",
+      note: "Tidak ditemukan di paket retur",
+    });
+    const damagedClaim = lost.state.returnClaims.find((claim) => claim.returnItemId === "RET-SHP-BUNDLE-01-item-1")!;
+    const lostClaim = lost.state.returnClaims.find((claim) => claim.returnItemId === "RET-SHP-BUNDLE-01-item-2")!;
+
+    const filedDamaged = applyCommand(lost.state, { type: "FILE_CLAIM", claimId: damagedClaim.id, evidenceReference: "foto-rusak-1" });
+    const resolvedDamaged = applyCommand(filedDamaged.state, { type: "RESOLVE_CLAIM", claimId: damagedClaim.id, resolution: "Dikirim ulang oleh seller", outcome: "REPLACED" });
+    expect(resolvedDamaged.result.ok).toBe(true);
+    expect(resolvedDamaged.state.returnClaims.find((claim) => claim.id === damagedClaim.id)?.outcome).toBe("REPLACED");
+
+    const filedLost = applyCommand(resolvedDamaged.state, { type: "FILE_CLAIM", claimId: lostClaim.id, evidenceReference: "resi-kurir-1" });
+    const blocked = applyCommand(filedLost.state, { type: "RESOLVE_CLAIM", claimId: lostClaim.id, resolution: "coba ganti", outcome: "REPLACED" });
+    expect(blocked.result.ok).toBe(false);
+
+    const reimbursed = applyCommand(filedLost.state, { type: "RESOLVE_CLAIM", claimId: lostClaim.id, resolution: "Kurir mengganti", outcome: "REIMBURSED" });
+    expect(reimbursed.result.ok).toBe(true);
+    expect(reimbursed.state.returnClaims.find((claim) => claim.id === lostClaim.id)?.status).toBe("RESOLVED");
+    expect(reimbursed.state.returnClaims.find((claim) => claim.id === lostClaim.id)?.outcome).toBe("REIMBURSED");
+  });
+
   it("creates linked manual correction instead of editing original", () => {
     const state = createDemoState();
     const original = state.ledgerEntries.find((entry) => entry.id === "led-bonus-missing-ref")!;

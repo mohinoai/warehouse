@@ -7,6 +7,7 @@ import { fmtDayDate } from "@/lib/format";
 import { logoutAction } from "@/app/actions";
 import { useDemoStore } from "./demo-store-provider";
 import { useToast } from "./toast";
+import { Dialog } from "./dialog";
 import {
   IconBundle,
   IconChecklist,
@@ -65,6 +66,7 @@ export function Sidebar({
   const { state, backendEnabled, resetDemo, failNextOperation } = useDemoStore();
   const toast = useToast();
   const [resetArmed, setResetArmed] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const anomalies = state.anomalies.filter((item) => item.status === "OPEN");
   const pendingReturns = state.returns.filter((item) => item.inspectionStatus === "PENDING");
   const today = fmtDayDate(new Date(state.demoNow));
@@ -204,11 +206,32 @@ export function Sidebar({
               </div>
             </div>
             {backendEnabled ? (
-              <form action={logoutAction}>
-                <button className="min-h-11 rounded-md border border-white/10 px-3 text-[10.5px] font-medium text-sidebar-text hover:bg-white/5">
+              <>
+                <button onClick={() => setLogoutOpen(true)} className="min-h-11 rounded-md border border-white/10 px-3 text-[10.5px] font-medium text-sidebar-text hover:bg-white/5">
                   Keluar
                 </button>
-              </form>
+                <Dialog
+                  open={logoutOpen}
+                  onClose={() => setLogoutOpen(false)}
+                  title="Konfirmasi Keluar"
+                  description="Apakah Anda yakin ingin keluar dari sistem? Anda harus login kembali untuk melanjutkan."
+                  size="sm"
+                >
+                  <div className="flex justify-end gap-3 border-t border-line-2 bg-surface p-4">
+                    <button
+                      onClick={() => setLogoutOpen(false)}
+                      className="min-h-[40px] rounded-lg border border-line bg-white px-5 text-[12.5px] font-semibold text-ink transition-all hover:bg-line-2"
+                    >
+                      Batal
+                    </button>
+                    <form action={logoutAction}>
+                      <button className="min-h-[40px] rounded-lg bg-[#dc2626] px-5 text-[12.5px] font-semibold text-white shadow-[0_4px_14px_rgba(220,38,38,0.25)] transition-all hover:bg-[#b91c1c]">
+                        Ya, Keluar
+                      </button>
+                    </form>
+                  </div>
+                </Dialog>
+              </>
             ) : null}
           </div>
         </div>

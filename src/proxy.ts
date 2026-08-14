@@ -37,7 +37,12 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // Carry over cookies the Supabase client set (including deletions when a
+    // stale refresh token is rejected), otherwise the fresh redirect response
+    // drops them and the browser resends the bad cookie on every request.
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
   }
   response.headers.set("Cache-Control", "private, no-store");
   return response;

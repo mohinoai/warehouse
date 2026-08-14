@@ -14,6 +14,7 @@ import type {
   ReferenceType,
   ReturnCase,
 } from "./types";
+import { CLAIM_OUTCOMES_BY_CONDITION } from "./types";
 
 const DAY = 86_400_000;
 
@@ -902,11 +903,21 @@ export function applyCommand(
     const claim = state.returnClaims.find((item) => item.id === command.claimId);
     if (!claim || claim.status !== "FILED" || !command.resolution.trim()) {
       result = rejected("Klaim belum dapat diselesaikan", "Resolution wajib dan klaim harus FILED.");
+    } else if (!CLAIM_OUTCOMES_BY_CONDITION[claim.condition].includes(command.outcome)) {
+      result = rejected(
+        "Hasil penyelesaian tidak valid",
+        `${command.outcome} tidak berlaku untuk klaim ${claim.condition}.`,
+      );
     } else {
       claim.status = "RESOLVED";
       claim.resolvedAt = state.demoNow;
       claim.resolution = command.resolution.trim();
-      result = processed("Klaim diselesaikan", `${claim.id} tidak lagi memicu reminder.`, { entityId: claim.id });
+      claim.outcome = command.outcome;
+      result = processed(
+        "Klaim diselesaikan",
+        `${claim.id} · ${command.outcome} · tidak lagi memicu reminder.`,
+        { entityId: claim.id },
+      );
     }
   } else if (command.type === "CORRECT_ENTRY") {
     const original = state.ledgerEntries.find((entry) => entry.id === command.entryId);

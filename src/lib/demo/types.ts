@@ -157,6 +157,15 @@ export interface ReturnCase {
 
 export type ClaimStatus = "OPEN" | "FILED" | "RESOLVED" | "REJECTED";
 
+// Damaged goods physically return to the warehouse, so a replacement claim is
+// possible. Lost goods never came back, so only reimbursement or write-off apply.
+export type ClaimOutcome = "REPLACED" | "REIMBURSED" | "WRITE_OFF";
+
+export const CLAIM_OUTCOMES_BY_CONDITION: Record<"DAMAGED" | "LOST", ClaimOutcome[]> = {
+  DAMAGED: ["REPLACED", "REIMBURSED", "WRITE_OFF"],
+  LOST: ["REIMBURSED", "WRITE_OFF"],
+};
+
 export interface ReturnClaim {
   id: string;
   returnId: string;
@@ -169,6 +178,7 @@ export interface ReturnClaim {
   filedAt?: string;
   resolvedAt?: string;
   resolution?: string;
+  outcome?: ClaimOutcome;
 }
 
 export interface OpnameCount {
@@ -303,7 +313,7 @@ export type DemoCommand =
       evidenceReference?: string;
     }
   | { type: "FILE_CLAIM"; claimId: string; evidenceReference: string }
-  | { type: "RESOLVE_CLAIM"; claimId: string; resolution: string }
+  | { type: "RESOLVE_CLAIM"; claimId: string; resolution: string; outcome: ClaimOutcome }
   | { type: "CORRECT_ENTRY"; entryId: string; note: string }
   | { type: "CREATE_OPNAME" }
   | {

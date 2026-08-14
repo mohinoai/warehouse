@@ -10,7 +10,7 @@ export function Card({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cx("rounded-lg border border-line bg-surface", className)}
+      className={cx("rounded-[1.25rem] border border-black/[0.06] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.03)]", className)}
       {...props}
     />
   );
@@ -19,11 +19,11 @@ export function Card({
 type Tone = "green" | "amber" | "red" | "neutral" | "ghost";
 
 const pillTone: Record<Tone, string> = {
-  green: "bg-green-soft text-green",
-  amber: "bg-amber-soft text-amber",
-  red: "bg-red-soft text-red",
-  neutral: "bg-line-2 text-ink-2",
-  ghost: "bg-line-2 text-muted",
+  green: "bg-[#e6f2ec] text-[#1f6b43]",
+  amber: "bg-[#fbf1dd] text-[#b07012]",
+  red: "bg-[#fbe7e3] text-[#c0392b]",
+  neutral: "bg-black/[0.04] text-ink-2",
+  ghost: "bg-transparent text-muted",
 };
 
 export function Pill({
@@ -38,7 +38,7 @@ export function Pill({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-[5px] rounded-full px-2 py-[2px] text-[11px] font-medium leading-[1.4]",
+        "inline-flex items-center gap-[5px] rounded-full px-2.5 py-[3px] text-[10.5px] font-semibold uppercase tracking-[0.04em]",
         pillTone[tone],
         className,
       )}
@@ -61,7 +61,7 @@ export function PillRect({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-[5px] rounded px-[7px] py-[2px] font-mono text-[10.5px] font-medium tracking-[0.02em]",
+        "inline-flex items-center gap-[5px] rounded-md px-2 py-[3px] font-mono text-[10px] font-medium tracking-wide",
         pillTone[tone],
         className,
       )}
@@ -75,7 +75,7 @@ export function Dot({ className }: { className?: string }) {
   return (
     <span
       className={cx(
-        "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
+        "inline-block h-[7px] w-[7px] shrink-0 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.1)]",
         className,
       )}
     />
@@ -92,7 +92,7 @@ export function SectionLabel({
   return (
     <div
       className={cx(
-        "text-[10.5px] font-medium uppercase tracking-[0.1em] text-muted",
+        "text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#75867d]",
         className,
       )}
     >
@@ -117,22 +117,22 @@ export function StatCard({
   foot?: ReactNode;
 }) {
   return (
-    <Card className="p-5">
-      <SectionLabel>{label}</SectionLabel>
-      <div className="mt-1.5 flex items-baseline gap-2">
+    <Card className="p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(0,0,0,0.06)] group">
+      <SectionLabel className="group-hover:text-green transition-colors duration-300">{label}</SectionLabel>
+      <div className="mt-3 flex items-baseline gap-2.5">
         <div
           className={cx(
-            "font-mono text-[30px] font-medium leading-none tabular-nums",
+            "font-mono text-[34px] font-semibold leading-none tracking-tight text-ink",
             valueClassName,
           )}
         >
           {value}
           {suffix}
         </div>
-        {badge}
+        {badge && <div className="ml-1">{badge}</div>}
       </div>
       {foot ? (
-        <div className="mt-3 flex items-center gap-1.5 text-[11.5px]">
+        <div className="mt-4 flex items-center gap-1.5 text-[11px] font-medium text-muted-2">
           {foot}
         </div>
       ) : null}

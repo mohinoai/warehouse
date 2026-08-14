@@ -9,6 +9,8 @@ import { Card, EmptyState, Pill, PillRect, SectionLabel, Skeleton } from "@/comp
 import { SuccessPanel } from "@/components/async-state";
 import { fmtDelta } from "@/lib/format";
 
+const inputClass = "min-h-[44px] w-full rounded-lg border border-black/[0.1] bg-black/[0.015] px-3.5 text-[12.5px] shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] outline-none transition-all focus:border-[#6cc795] focus:bg-white focus:ring-[3px] focus:ring-[#6cc795]/20 disabled:bg-black/[0.04] disabled:opacity-70 disabled:cursor-not-allowed";
+
 function formatTime(value?: string) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(new Date(value));
@@ -106,7 +108,7 @@ function OpnameScreen() {
     }
   }
 
-  if (!selected) return <section className="p-7"><Card><EmptyState title="Belum ada sesi opname" action={<button onClick={createSession} disabled={creating} aria-busy={creating} className="min-h-11 rounded-md bg-green px-4 text-[12px] font-medium text-white disabled:cursor-wait disabled:opacity-60">{creating ? "Membuat sesi…" : "Sesi Opname Baru"}</button>} /></Card></section>;
+  if (!selected) return <section className="p-7"><Card><EmptyState title="Belum ada sesi opname" action={<button onClick={createSession} disabled={creating} aria-busy={creating} className="min-h-[44px] rounded-lg bg-gradient-to-b from-[#2a8757] to-[#17623c] px-5 text-[12.5px] font-semibold text-white shadow-[0_4px_14px_rgba(31,107,67,0.25)] transition-all disabled:opacity-40 hover:from-[#319c65] hover:to-[#1a7044]">{creating ? "Membuat sesi…" : "Sesi Opname Baru"}</button>} /></Card></section>;
 
   const counted = selected.counts.filter((count) => values[count.batchId] !== "" || exceptions[count.batchId]).length;
   const previewRows = selected.counts
@@ -117,43 +119,158 @@ function OpnameScreen() {
 
   return (
     <section className="mx-auto max-w-[1720px] animate-fade-in px-4 py-6 sm:px-7">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-[17px] font-medium">Stok Opname</h2><p className="mt-0.5 text-[12px] text-muted">Hitung fisik per batch, preview koreksi, lalu kunci sesi.</p></div><button onClick={createSession} disabled={creating} aria-busy={creating} className="min-h-11 rounded-md bg-green px-4 text-[12.5px] font-medium text-white disabled:cursor-wait disabled:opacity-60">{creating ? "Membuat sesi…" : "Sesi Opname Baru"}</button></div>
-      {lastResult ? <div className="mb-4"><SuccessPanel>{lastResult}</SuccessPanel></div> : null}
-      <div className="grid grid-cols-12 gap-4">
-        <Card className="col-span-12 h-fit overflow-hidden lg:col-span-3">
-          <div className="border-b border-line-2 px-4 py-3"><h3 className="text-[13px] font-medium">Daftar sesi</h3></div>
-          <div className="divide-y divide-line-2">{state.opnameSessions.map((session) => { const completed = session.counts.filter((count) => count.physicalQty !== undefined || count.exceptionReason).length; return <button key={session.id} onClick={() => chooseSession(session.id)} className={`w-full p-4 text-left ${selected.id === session.id ? "bg-green-soft" : "hover:bg-line-2"}`}><div className="flex items-center justify-between gap-2"><strong className="font-mono text-[11px]">{session.id}</strong><PillRect tone={session.status === "DRAFT" ? "amber" : "green"}>{session.status}</PillRect></div><p className="mt-2 text-[10.5px] text-muted">{session.warehouse} · {formatTime(session.startedAt)}</p><p className="mt-1 font-mono text-[10px] text-muted">{completed}/{session.counts.length} batch · {session.createdBy}</p></button>; })}</div>
-        </Card>
-
-        <Card className="col-span-12 overflow-hidden lg:col-span-9">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line-2 p-4"><div><SectionLabel>Sesi terpilih</SectionLabel><h3 className="mt-1 font-mono text-[14px] font-semibold">{selected.id}</h3><p className="mt-1 text-[10.5px] text-muted">Mulai {formatTime(selected.startedAt)} · final {formatTime(selected.finalizedAt)}</p></div><Pill tone={selected.status === "DRAFT" ? "amber" : "green"}>{selected.status === "DRAFT" ? `${counted}/${selected.counts.length} dihitung` : "Terkunci"}</Pill></div>
-          <div className="hidden grid-cols-[1.4fr_100px_130px_1fr_100px] border-b border-line-2 bg-line-2/50 px-4 py-2 text-[9.5px] font-medium uppercase tracking-[0.08em] text-muted md:grid"><span>Produk/batch</span><span className="text-right">Sistem</span><span className="text-right">Fisik</span><span>Pengecualian</span><span className="text-right">Selisih</span></div>
-          <div className="divide-y divide-line-2">
-            {selected.counts.map((count) => {
-              const batch = state.batches.find((item) => item.id === count.batchId);
-              const product = state.products.find((item) => item.id === batch?.productId);
-              const physical = values[count.batchId] === "" ? undefined : Number(values[count.batchId]);
-              const delta = physical === undefined ? undefined : physical - count.systemQty;
-              return (
-                <div key={count.batchId} className="grid gap-3 px-4 py-3 md:grid-cols-[1.4fr_100px_130px_1fr_100px] md:items-center">
-                  <div><strong className="text-[11.5px]">{product?.name}</strong><div className="font-mono text-[9.5px] text-muted">{batch?.code} · {batch?.origin}{batch?.verificationStatus === "UNVERIFIED" ? " · BELUM TERVERIFIKASI" : ""}</div></div>
-                  <div className="flex justify-between md:block md:text-right"><span className="text-[10px] text-muted md:hidden">Stok sistem</span><strong className="font-mono text-[12px]">{count.systemQty}</strong></div>
-                  <label><span className="text-[10px] text-muted md:hidden">Stok fisik</span><input disabled={selected.status === "FINALIZED"} type="number" min={0} step={1} value={values[count.batchId] ?? ""} onChange={(event) => setValues({ ...values, [count.batchId]: event.target.value })} className="min-h-11 w-full rounded-md border border-line px-3 text-right font-mono text-[12px] disabled:bg-line-2" aria-label={`Hitungan fisik ${batch?.code}`} /></label>
-                  <label><span className="text-[10px] text-muted md:hidden">Alasan pengecualian</span><input disabled={selected.status === "FINALIZED" || values[count.batchId] !== ""} value={exceptions[count.batchId] ?? ""} onChange={(event) => setExceptions({ ...exceptions, [count.batchId]: event.target.value })} placeholder="Jika tidak dihitung…" className="min-h-11 w-full rounded-md border border-line px-3 text-[11px] disabled:bg-line-2" aria-label={`Pengecualian ${batch?.code}`} /></label>
-                  <div className="text-right">{delta === undefined ? <PillRect tone={exceptions[count.batchId] ? "neutral" : "ghost"}>{exceptions[count.batchId] ? "DIKECUALIKAN" : "BELUM"}</PillRect> : <strong className={`font-mono text-[12px] ${delta === 0 ? "text-green" : delta < 0 ? "text-red" : "text-amber"}`}>{fmtDelta(delta)}</strong>}</div>
-                </div>
-              );
-            })}
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[18px] font-semibold tracking-tight text-ink">Stok Opname</h2>
+          <p className="mt-1 text-[12px] text-muted-2">Hitung fisik per batch, preview koreksi, lalu kunci sesi.</p>
+        </div>
+        <button onClick={createSession} disabled={creating} aria-busy={creating} className="min-h-[44px] rounded-lg bg-gradient-to-b from-[#2a8757] to-[#17623c] px-5 text-[12.5px] font-semibold text-white shadow-[0_4px_14px_rgba(31,107,67,0.25)] transition-all disabled:opacity-40 hover:from-[#319c65] hover:to-[#1a7044]">{creating ? "Membuat sesi…" : "Sesi Opname Baru"}</button>
+      </div>
+      
+      {lastResult ? <div className="mb-5"><SuccessPanel>{lastResult}</SuccessPanel></div> : null}
+      
+      <div className="grid grid-cols-12 gap-5">
+        <div className="col-span-12 space-y-3 lg:col-span-4 xl:col-span-3">
+          <div className="mb-2 px-1">
+            <h3 className="text-[13px] font-semibold text-ink">Daftar sesi</h3>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-2 p-4"><div><strong className="text-[11.5px]">Progress {counted}/{selected.counts.length}</strong><p className="mt-1 text-[10.5px] text-muted">{missing ? `${missing} batch belum dihitung atau dikecualikan` : "Scope lengkap, siap ditinjau"}</p></div>{selected.status === "DRAFT" ? <div className="flex gap-2"><button onClick={saveDraft} className="min-h-11 rounded-md border border-line px-4 text-[12px] font-medium">Simpan Draft</button><button onClick={reviewFinalization} className="min-h-11 rounded-md bg-green px-4 text-[12px] font-medium text-white">Tinjau Finalisasi</button></div> : <div className="text-right"><PillRect tone="green">FINAL · LOCKED</PillRect><p className="mt-1 text-[10px] text-muted">{selected.correctionEntryIds.length} koreksi tertaut</p></div>}</div>
-        </Card>
+          {state.opnameSessions.map((session) => {
+            const completed = session.counts.filter((count) => count.physicalQty !== undefined || count.exceptionReason).length;
+            return (
+              <button key={session.id} onClick={() => chooseSession(session.id)} className={`group block w-full rounded-xl border p-5 text-left transition-colors ${selected.id === session.id ? "border-[#6cc795]/50 bg-[#e6f2ec]/60 shadow-[0_2px_10px_rgba(108,199,149,0.1)]" : "border-black/[0.06] bg-white hover:border-black/[0.15] hover:bg-[#f6f7f5]/80 shadow-sm"}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="font-mono text-[12.5px] text-ink">{session.id}</strong>
+                  <PillRect tone={session.status === "DRAFT" ? "amber" : "green"}>{session.status}</PillRect>
+                </div>
+                <p className="mt-2 text-[11px] text-muted-2">{session.warehouse} · {formatTime(session.startedAt)}</p>
+                <p className="mt-1.5 font-mono text-[10px] text-muted-2">{completed}/{session.counts.length} batch · {session.createdBy}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="col-span-12 lg:col-span-8 xl:col-span-9">
+          <Card className="overflow-hidden border-black/[0.06] shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/[0.06] bg-[#fcfdfc] p-6">
+              <div>
+                <SectionLabel>Sesi terpilih</SectionLabel>
+                <h3 className="mt-2 font-mono text-[15px] font-semibold text-ink">{selected.id}</h3>
+                <p className="mt-1.5 text-[11px] text-muted-2">Mulai {formatTime(selected.startedAt)} · final {formatTime(selected.finalizedAt)}</p>
+              </div>
+              <Pill tone={selected.status === "DRAFT" ? "amber" : "green"}>{selected.status === "DRAFT" ? `${counted}/${selected.counts.length} dihitung` : "Terkunci"}</Pill>
+            </div>
+            
+            <div className="hidden grid-cols-[1.4fr_90px_140px_1.2fr_100px] border-b border-black/[0.06] bg-black/[0.015] px-6 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-2 xl:grid">
+              <span>Produk/batch</span>
+              <span className="text-right">Sistem</span>
+              <span className="text-right pr-2">Fisik</span>
+              <span>Pengecualian</span>
+              <span className="text-right">Selisih</span>
+            </div>
+            
+            <div className="divide-y divide-black/[0.04]">
+              {selected.counts.map((count) => {
+                const batch = state.batches.find((item) => item.id === count.batchId);
+                const product = state.products.find((item) => item.id === batch?.productId);
+                const physical = values[count.batchId] === "" ? undefined : Number(values[count.batchId]);
+                const delta = physical === undefined ? undefined : physical - count.systemQty;
+                return (
+                  <div key={count.batchId} className="grid gap-4 px-6 py-4 xl:grid-cols-[1.4fr_90px_140px_1.2fr_100px] xl:items-center">
+                    <div>
+                      <strong className="text-[12.5px] text-ink">{product?.name}</strong>
+                      <div className="mt-1 font-mono text-[10.5px] text-muted-2">{batch?.code} · {batch?.origin}{batch?.verificationStatus === "UNVERIFIED" ? " · BELUM TERVERIFIKASI" : ""}</div>
+                    </div>
+                    <div className="flex justify-between xl:block xl:text-right">
+                      <span className="text-[10px] font-semibold uppercase text-muted-2 xl:hidden">Stok sistem</span>
+                      <strong className="font-mono text-[13px] text-ink">{count.systemQty}</strong>
+                    </div>
+                    <label>
+                      <span className="text-[10px] font-semibold uppercase text-muted-2 xl:hidden mb-2 block">Stok fisik</span>
+                      <input disabled={selected.status === "FINALIZED"} type="number" min={0} step={1} value={values[count.batchId] ?? ""} onChange={(event) => setValues({ ...values, [count.batchId]: event.target.value })} className={`${inputClass} text-right font-mono text-[13px] font-semibold`} aria-label={`Hitungan fisik ${batch?.code}`} />
+                    </label>
+                    <label>
+                      <span className="text-[10px] font-semibold uppercase text-muted-2 xl:hidden mb-2 block">Alasan pengecualian</span>
+                      <input disabled={selected.status === "FINALIZED" || values[count.batchId] !== ""} value={exceptions[count.batchId] ?? ""} onChange={(event) => setExceptions({ ...exceptions, [count.batchId]: event.target.value })} placeholder="Jika tidak dihitung…" className={`${inputClass}`} aria-label={`Pengecualian ${batch?.code}`} />
+                    </label>
+                    <div className="text-right">
+                      {delta === undefined ? <PillRect tone={exceptions[count.batchId] ? "neutral" : "ghost"}>{exceptions[count.batchId] ? "DIKECUALIKAN" : "BELUM"}</PillRect> : <strong className={`font-mono text-[14px] ${delta === 0 ? "text-[#1f6b43]" : delta < 0 ? "text-[#b91c1c]" : "text-[#b07012]"}`}>{fmtDelta(delta)}</strong>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="flex flex-wrap items-center justify-between gap-4 border-t border-black/[0.06] bg-[#fcfdfc] p-6 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01)]">
+              <div>
+                <strong className="text-[12.5px] text-ink">Progress {counted}/{selected.counts.length}</strong>
+                <p className="mt-1 text-[11px] text-muted-2">{missing ? `${missing} batch belum dihitung atau dikecualikan` : "Scope lengkap, siap ditinjau"}</p>
+              </div>
+              {selected.status === "DRAFT" ? (
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={saveDraft} className="min-h-[44px] rounded-lg border border-black/[0.08] bg-white px-5 text-[12.5px] font-semibold text-ink-2 shadow-sm transition-all hover:bg-black/[0.02]">Simpan Draft</button>
+                  <button onClick={reviewFinalization} className="min-h-[44px] rounded-lg bg-gradient-to-b from-[#2a8757] to-[#17623c] px-5 text-[12.5px] font-semibold text-white shadow-[0_4px_14px_rgba(31,107,67,0.25)] transition-all hover:from-[#319c65] hover:to-[#1a7044]">Tinjau Finalisasi</button>
+                </div>
+              ) : (
+                <div className="text-right">
+                  <PillRect tone="green">FINAL · LOCKED</PillRect>
+                  <p className="mt-1.5 text-[11px] text-muted-2">{selected.correctionEntryIds.length} koreksi tertaut</p>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
 
       {previewOpen ? (
-        <Card className="mt-4 overflow-hidden border-green/30"><div className="border-b border-line-2 bg-green-soft px-5 py-4"><SectionLabel>Preview finalisasi opname</SectionLabel><h3 className="mt-1 text-[14px] font-semibold">Konfirmasi dampak sebelum sesi dikunci</h3></div><div className="grid gap-3 p-5 sm:grid-cols-4"><div><SectionLabel>Total batch</SectionLabel><strong className="mt-1 block font-mono text-xl">{selected.counts.length}</strong></div><div><SectionLabel>Daftar selisih</SectionLabel><strong className="mt-1 block font-mono text-xl">{previewRows.length}</strong></div><div><SectionLabel>Total dampak</SectionLabel><strong className={`mt-1 block font-mono text-xl ${totalImpact < 0 ? "text-red" : "text-green"}`}>{fmtDelta(totalImpact)}</strong></div><div><SectionLabel>Ledger baru</SectionLabel><strong className="mt-1 block font-mono text-xl">{previewRows.length}</strong></div></div><div className="divide-y divide-line-2 border-y border-line-2">{previewRows.map((count) => { const batch = state.batches.find((item) => item.id === count.batchId); const product = state.products.find((item) => item.id === batch?.productId); return <div key={count.batchId} className="flex items-center justify-between gap-3 px-5 py-3 text-[11.5px]"><div><strong>{product?.name}</strong><div className="font-mono text-[9.5px] text-muted">{batch?.code}</div></div><strong className="font-mono">{count.systemQty} → {count.physical} ({fmtDelta(count.physical! - count.systemQty)})</strong></div>; })}{previewRows.length === 0 ? <div className="px-5 py-4 text-[11.5px] text-muted">Tidak ada selisih; finalisasi tetap memverifikasi opening balance dalam scope.</div> : null}</div><div className="flex flex-wrap items-center justify-between gap-3 p-5"><p className="max-w-xl text-[11px] text-muted">Setelah finalisasi, sesi tidak dapat diedit atau difinalisasi ulang. Opening balance dalam scope menjadi terverifikasi dan tertaut ke sesi ini.</p><div className="flex gap-2"><button onClick={() => setPreviewOpen(false)} className="min-h-11 rounded-md border border-line px-4 text-[12px] font-medium">Kembali</button><button onClick={finalize} className="min-h-11 rounded-md bg-green px-4 text-[12px] font-medium text-white">Finalisasi &amp; Buat Koreksi</button></div></div></Card>
+        <Card className="mt-6 overflow-hidden border-[#6cc795]/50 shadow-[0_4px_24px_rgba(108,199,149,0.15)]">
+          <div className="border-b border-black/[0.06] bg-[#e6f2ec]/60 px-6 py-5">
+            <SectionLabel>Preview finalisasi opname</SectionLabel>
+            <h3 className="mt-1 text-[15px] font-semibold text-ink">Konfirmasi dampak sebelum sesi dikunci</h3>
+          </div>
+          <div className="grid gap-4 p-6 sm:grid-cols-4">
+            <div><SectionLabel>Total batch</SectionLabel><strong className="mt-2 block font-mono text-2xl text-ink">{selected.counts.length}</strong></div>
+            <div><SectionLabel>Daftar selisih</SectionLabel><strong className="mt-2 block font-mono text-2xl text-ink">{previewRows.length}</strong></div>
+            <div><SectionLabel>Total dampak</SectionLabel><strong className={`mt-2 block font-mono text-2xl ${totalImpact < 0 ? "text-[#b91c1c]" : "text-[#1f6b43]"}`}>{fmtDelta(totalImpact)}</strong></div>
+            <div><SectionLabel>Ledger baru</SectionLabel><strong className="mt-2 block font-mono text-2xl text-ink">{previewRows.length}</strong></div>
+          </div>
+          <div className="divide-y divide-black/[0.04] border-y border-black/[0.06] bg-black/[0.01]">
+            {previewRows.map((count) => {
+              const batch = state.batches.find((item) => item.id === count.batchId);
+              const product = state.products.find((item) => item.id === batch?.productId);
+              return (
+                <div key={count.batchId} className="flex items-center justify-between gap-4 px-6 py-4 text-[12.5px]">
+                  <div>
+                    <strong className="text-ink">{product?.name}</strong>
+                    <div className="mt-1 font-mono text-[10.5px] text-muted-2">{batch?.code}</div>
+                  </div>
+                  <strong className="font-mono text-[13px] text-ink">{count.systemQty} → {count.physical} <span className={count.physical! - count.systemQty < 0 ? "text-[#b91c1c]" : "text-[#1f6b43]"}>({fmtDelta(count.physical! - count.systemQty)})</span></strong>
+                </div>
+              );
+            })}
+            {previewRows.length === 0 ? <div className="px-6 py-5 text-[12.5px] text-muted-2">Tidak ada selisih; finalisasi tetap memverifikasi opening balance dalam scope.</div> : null}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-4 p-6">
+            <p className="max-w-xl text-[11.5px] text-muted-2 leading-relaxed">Setelah finalisasi, sesi tidak dapat diedit atau difinalisasi ulang. Opening balance dalam scope menjadi terverifikasi dan tertaut ke sesi ini.</p>
+            <div className="flex flex-wrap gap-3">
+              <button onClick={() => setPreviewOpen(false)} className="min-h-[44px] rounded-lg border border-black/[0.08] bg-white px-5 text-[12.5px] font-semibold text-ink-2 shadow-sm transition-all hover:bg-black/[0.02]">Kembali</button>
+              <button onClick={finalize} className="min-h-[44px] rounded-lg bg-gradient-to-b from-[#2a8757] to-[#17623c] px-5 text-[12.5px] font-semibold text-white shadow-[0_4px_14px_rgba(31,107,67,0.25)] transition-all hover:from-[#319c65] hover:to-[#1a7044]">Finalisasi &amp; Buat Koreksi</button>
+            </div>
+          </div>
+        </Card>
       ) : null}
 
-      {selected.status === "FINALIZED" && selected.correctionEntryIds.length ? <Card className="mt-4 p-4"><SectionLabel>Ledger correction</SectionLabel><div className="mt-2 flex flex-wrap gap-2">{selected.correctionEntryIds.map((id) => <Link key={id} href={`/ledger?entry=${id}`} className="min-h-11 rounded-md bg-line-2 px-3 py-3 font-mono text-[10.5px] text-green">{id} →</Link>)}</div></Card> : null}
+      {selected.status === "FINALIZED" && selected.correctionEntryIds.length ? (
+        <Card className="mt-6 border-black/[0.06] p-6 shadow-sm">
+          <SectionLabel>Ledger correction</SectionLabel>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selected.correctionEntryIds.map((id) => (
+              <Link key={id} href={`/ledger?entry=${id}`} className="min-h-11 rounded-lg bg-[#e6f2ec]/60 border border-[#6cc795]/30 px-4 py-3 font-mono text-[11.5px] text-[#1f6b43] transition-colors hover:bg-[#d1e8db] hover:border-[#6cc795]/50">
+                {id} →
+              </Link>
+            ))}
+          </div>
+        </Card>
+      ) : null}
     </section>
   );
 }

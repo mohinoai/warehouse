@@ -39,15 +39,16 @@ export function LogoMark({ size = 32 }: { size?: number }) {
   );
 }
 
-export function LogoLockup() {
+export function LogoLockup({ textColor = "light" }: { textColor?: "light" | "dark" }) {
+  const isDarkText = textColor === "dark";
   return (
     <div className="flex items-center gap-2.5">
       <LogoMark size={34} />
       <div>
-        <div className="text-[15.5px] font-semibold leading-none tracking-tight text-white">
+        <div className={`text-[15.5px] font-semibold leading-none tracking-tight ${isDarkText ? "text-ink" : "text-white"}`}>
           Jejak
         </div>
-        <div className="mt-1 text-[9.5px] font-medium uppercase tracking-[0.16em] text-sidebar-text">
+        <div className={`mt-1 text-[9.5px] font-medium uppercase tracking-[0.16em] ${isDarkText ? "text-muted" : "text-sidebar-text"}`}>
           Rekonsiliasi Stok
         </div>
       </div>

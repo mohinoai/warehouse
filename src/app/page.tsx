@@ -8,6 +8,7 @@ import { Card, Dot, EmptyState, Pill, PillRect, StatCard } from "@/components/ui
 import { LoadingRows, SuccessPanel } from "@/components/async-state";
 import { IconRefresh } from "@/components/icons";
 import { batchQty, daysUntil, isExpired, productOnHand, productReserved, productSellable } from "@/lib/demo/engine";
+import { buildCsv, downloadCsv } from "@/lib/csv";
 import { fmt, fmtDelta } from "@/lib/format";
 
 type Filter = "OPEN" | "KRITIS" | "PERINGATAN" | "RESOLVED";
@@ -51,6 +52,14 @@ export default function DashboardPage() {
   }));
   const channelMax = Math.max(1, ...channels.map((item) => item.qty));
 
+  function exportWorklist() {
+    const csvRows = rows.map((anomaly) => [anomaly.priority, anomaly.status, anomaly.type, anomaly.title, anomaly.description, anomaly.referenceLabel, anomaly.source, anomaly.target, anomaly.id]);
+    downloadCsv(
+      `jejak-worklist-${state.demoNow.slice(0, 10)}.csv`,
+      buildCsv(["Prioritas", "Status", "Tipe", "Judul", "Deskripsi", "Referensi", "Sumber", "Target", "ID"], csvRows),
+    );
+  }
+
   async function rerun() {
     setRerunning(true);
     await new Promise((resolve) => setTimeout(resolve, 650));
@@ -70,18 +79,149 @@ export default function DashboardPage() {
         <div className="col-span-12 sm:col-span-6 lg:col-span-3"><StatCard label="Batch Mendekati Expiry" value={String(expiring)} valueClassName="text-amber" foot={<span className="text-muted">30 hari · batch expired tidak sellable</span>} /></div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3"><div><h2 className="text-[16px] font-medium">Worklist Anomali Harian</h2><p className="mt-0.5 text-[12px] text-muted">Terakhir dijalankan {formatTime(state.lastReconciledAt)} · setiap item punya exact deep-link</p></div><div className="worklist-controls"><div className="worklist-tabs rounded-md bg-[#E9ECE7] p-0.5">{(["OPEN", "KRITIS", "PERINGATAN", "RESOLVED"] as Filter[]).map((item) => <button key={item} onClick={() => setFilter(item)} className={`min-h-11 min-w-0 truncate rounded px-1 text-[9.5px] font-medium sm:px-3 sm:text-[10.5px] ${filter === item ? "bg-surface shadow-sm" : "text-muted"}`}>{item === "OPEN" ? "Terbuka" : item === "RESOLVED" ? "Selesai" : item === "KRITIS" ? "Kritis" : "Peringatan"}</button>)}</div><button onClick={rerun} disabled={rerunning} className="flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-line bg-surface px-3 text-[12px] font-medium disabled:opacity-50"><IconRefresh size={13} className={rerunning ? "animate-spin" : undefined} />{rerunning ? "Menjalankan…" : "Jalankan Ulang"}</button></div></div>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[17px] font-semibold tracking-tight text-ink">Worklist Anomali Harian</h2>
+          <p className="mt-1 text-[12px] text-muted-2">Terakhir dijalankan {formatTime(state.lastReconciledAt)} · setiap item punya exact deep-link</p>
+        </div>
+        <div className="worklist-controls">
+          <div className="worklist-tabs rounded-lg bg-black/[0.04] p-1 shadow-inner">
+            {(["OPEN", "KRITIS", "PERINGATAN", "RESOLVED"] as Filter[]).map((item) => (
+              <button
+                key={item}
+                onClick={() => setFilter(item)}
+                className={`min-h-10 min-w-0 truncate rounded-md px-2 text-[10px] font-semibold tracking-wide uppercase transition-all duration-200 sm:px-4 sm:text-[10.5px] ${
+                  filter === item
+                    ? "bg-white text-ink shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
+                    : "text-muted hover:text-ink-2"
+                }`}
+              >
+                {item === "OPEN" ? "Terbuka" : item === "RESOLVED" ? "Selesai" : item === "KRITIS" ? "Kritis" : "Peringatan"}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={exportWorklist}
+            disabled={rows.length === 0}
+            className="flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-[12px] font-semibold tracking-wide shadow-sm transition-all duration-200 hover:bg-black/[0.02] hover:shadow disabled:opacity-40"
+          >
+            Export CSV ({rows.length})
+          </button>
+          <button
+            onClick={rerun}
+            disabled={rerunning}
+            className="flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-line bg-white px-4 text-[12px] font-semibold tracking-wide shadow-sm transition-all duration-200 hover:bg-black/[0.02] hover:shadow disabled:opacity-50"
+          >
+            <IconRefresh size={14} className={rerunning ? "animate-spin" : undefined} />
+            {rerunning ? "Menjalankan…" : "Jalankan Ulang"}
+          </button>
+        </div>
+      </div>
 
-      <Card className="overflow-hidden">
-        {rerunning ? <LoadingRows count={4} /> : rows.length === 0 ? <EmptyState title={filter === "RESOLVED" ? "Belum ada item selesai" : "Tidak ada anomali pada filter ini"} description="Worklist dihitung dari ledger, order, return, batch, dan claim." /> : <div className="divide-y divide-line-2">{rows.map((anomaly) => <div key={anomaly.id} className="grid gap-3 px-4 py-4 md:grid-cols-[120px_1.4fr_1fr_110px] md:items-center"><div><Pill tone={anomaly.status === "RESOLVED" ? "green" : anomaly.priority === "KRITIS" ? "red" : "amber"}>{anomaly.status === "RESOLVED" ? "Selesai" : anomaly.priority === "KRITIS" ? "Kritis" : "Peringatan"}</Pill></div><div><strong className="text-[12.5px]">{anomaly.title}</strong><p className="mt-1 text-[11px] leading-relaxed text-muted">{anomaly.description}</p></div><div><strong className="text-[11.5px]">{anomaly.referenceLabel}</strong><div className="mt-1"><PillRect tone="neutral">{anomaly.source}</PillRect></div></div><Link href={anomaly.target} className="min-h-11 py-3 text-right text-[12px] font-medium text-green hover:underline">Tindak lanjut →</Link></div>)}</div>}
+      <Card className="overflow-hidden mb-6">
+        {rerunning ? (
+          <LoadingRows count={4} />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title={filter === "RESOLVED" ? "Belum ada item selesai" : "Tidak ada anomali pada filter ini"}
+            description="Worklist dihitung dari ledger, order, return, batch, dan claim."
+          />
+        ) : (
+          <div className="divide-y divide-black/[0.04]">
+            {rows.map((anomaly) => (
+              <div
+                key={anomaly.id}
+                className="group grid gap-3 px-5 py-4 transition-colors duration-200 hover:bg-[#f6f7f5]/60 md:grid-cols-[130px_1.4fr_1fr_120px] md:items-center"
+              >
+                <div>
+                  <Pill tone={anomaly.status === "RESOLVED" ? "green" : anomaly.priority === "KRITIS" ? "red" : "amber"}>
+                    {anomaly.status === "RESOLVED" ? "Selesai" : anomaly.priority === "KRITIS" ? "Kritis" : "Peringatan"}
+                  </Pill>
+                </div>
+                <div>
+                  <strong className="text-[13px] font-semibold text-ink group-hover:text-green-2 transition-colors">{anomaly.title}</strong>
+                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted-2">{anomaly.description}</p>
+                </div>
+                <div>
+                  <strong className="text-[12px] font-medium text-ink-2">{anomaly.referenceLabel}</strong>
+                  <div className="mt-1.5">
+                    <PillRect tone="neutral">{anomaly.source}</PillRect>
+                  </div>
+                </div>
+                <Link
+                  href={anomaly.target}
+                  className="flex h-11 items-center justify-end text-[12.5px] font-semibold text-[#1f6b43] transition-all hover:text-[#17623c] hover:translate-x-0.5"
+                >
+                  Tindak lanjut →
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
-      <div className="mt-5 grid grid-cols-12 gap-3">
-        <Card className="col-span-12 p-5 lg:col-span-7">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-[14px] font-medium">Pergerakan ledger · 14 hari</h3><p className="mt-1 text-[11px] text-muted">Nilai tersedia permanen untuk touch dan keyboard, bukan hanya hover.</p></div><div className="flex gap-3 text-[10.5px]"><span className="flex items-center gap-1.5"><Dot className="bg-chart-in" />Masuk</span><span className="flex items-center gap-1.5"><Dot className="bg-chart-out" />Keluar</span></div></div>
-          <div className="grid grid-cols-7 gap-x-2 gap-y-4 sm:grid-cols-[repeat(14,minmax(0,1fr))]">{movement.map((item) => <div key={item.key} className="min-w-0 text-center"><div className="flex h-28 items-end justify-center gap-1 border-b border-line"><div title={`${item.incoming} masuk`} className="w-2 rounded-t bg-chart-in" style={{ height: `${Math.max(item.incoming ? 4 : 0, (item.incoming / chartMax) * 100)}%` }} /><div title={`${item.outgoing} keluar`} className="w-2 rounded-t bg-chart-out" style={{ height: `${Math.max(item.outgoing ? 4 : 0, (item.outgoing / chartMax) * 100)}%` }} /></div><div className="mt-1 truncate font-mono text-[8px] text-muted">{item.label}</div><div className="mt-1 font-mono text-[8px]"><span className="text-green">+{item.incoming}</span><span className="ml-1 text-red">−{item.outgoing}</span></div></div>)}</div>
+      <div className="mt-6 grid grid-cols-12 gap-4">
+        <Card className="col-span-12 p-6 lg:col-span-7">
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-[15px] font-semibold tracking-tight text-ink">Pergerakan ledger · 14 hari</h3>
+              <p className="mt-1.5 text-[11.5px] text-muted-2">Nilai tersedia permanen untuk touch dan keyboard, bukan hanya hover.</p>
+            </div>
+            <div className="flex gap-4 text-[11px] font-medium text-muted-2">
+              <span className="flex items-center gap-2">
+                <Dot className="bg-chart-in" />
+                Masuk
+              </span>
+              <span className="flex items-center gap-2">
+                <Dot className="bg-chart-out" />
+                Keluar
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-7 gap-x-2 gap-y-4 sm:grid-cols-[repeat(14,minmax(0,1fr))]">
+            {movement.map((item) => (
+              <div key={item.key} className="group min-w-0 text-center">
+                <div className="flex h-[120px] items-end justify-center gap-1 border-b border-black/[0.06] pb-1 transition-all duration-300 group-hover:border-line">
+                  <div
+                    title={`${item.incoming} masuk`}
+                    className="w-2.5 rounded-t-sm bg-chart-in/90 transition-all duration-300 group-hover:bg-chart-in"
+                    style={{ height: `${Math.max(item.incoming ? 4 : 0, (item.incoming / chartMax) * 100)}%` }}
+                  />
+                  <div
+                    title={`${item.outgoing} keluar`}
+                    className="w-2.5 rounded-t-sm bg-chart-out/90 transition-all duration-300 group-hover:bg-chart-out"
+                    style={{ height: `${Math.max(item.outgoing ? 4 : 0, (item.outgoing / chartMax) * 100)}%` }}
+                  />
+                </div>
+                <div className="mt-2 truncate font-mono text-[9px] font-medium text-muted">{item.label}</div>
+                <div className="mt-1 font-mono text-[9px] font-medium">
+                  <span className="text-[#1f6b43]">+{item.incoming}</span>
+                  <span className="ml-1 text-[#b07012]">−{item.outgoing}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
-        <Card className="col-span-12 p-5 lg:col-span-5"><h3 className="text-[14px] font-medium">Distribusi keluar per kanal</h3><p className="mt-1 text-[11px] text-muted">Reason dan channel tetap terpisah pada setiap entry.</p><div className="mt-5 space-y-4">{channels.map((item) => <div key={item.channel}><div className="mb-1.5 flex justify-between text-[11.5px]"><strong>{item.channel}</strong><span className="font-mono">{item.qty} unit</span></div><div className="h-2 rounded-full bg-line-2"><div className="h-full rounded-full bg-green" style={{ width: `${(item.qty / channelMax) * 100}%` }} /></div></div>)}</div><div className="mt-5 border-t border-line-2 pt-4 text-[11px] text-muted">Net ledger saat ini: <strong className="font-mono text-ink">{fmtDelta(state.ledgerEntries.reduce((total, entry) => total + entry.qtyDelta, 0))}</strong></div></Card>
+        <Card className="col-span-12 p-6 lg:col-span-5">
+          <h3 className="text-[15px] font-semibold tracking-tight text-ink">Distribusi keluar per kanal</h3>
+          <p className="mt-1.5 text-[11.5px] text-muted-2">Reason dan channel tetap terpisah pada setiap entry.</p>
+          <div className="mt-6 space-y-5">
+            {channels.map((item) => (
+              <div key={item.channel}>
+                <div className="mb-2 flex justify-between text-[12px]">
+                  <strong className="text-ink-2 font-medium tracking-wide">{item.channel}</strong>
+                  <span className="font-mono font-medium">{item.qty} unit</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-black/[0.04]">
+                  <div className="h-full rounded-full bg-gradient-to-r from-[#1f6b43] to-[#34a269] shadow-sm" style={{ width: `${(item.qty / channelMax) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 border-t border-black/[0.06] pt-5 text-[11.5px] text-muted-2">
+            Net ledger saat ini: <strong className="font-mono text-[13px] text-ink">{fmtDelta(state.ledgerEntries.reduce((total, entry) => total + entry.qtyDelta, 0))}</strong>
+          </div>
+        </Card>
       </div>
     </section>
   );
