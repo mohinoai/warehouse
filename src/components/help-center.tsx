@@ -55,17 +55,6 @@ export function HelpCenter({ open, onClose }: { open: boolean; onClose: () => vo
           ))}
         </div>
       </div>
-
-      <div className="border-t border-line-2 px-5 py-4">
-        <a
-          href="https://github.com/mohinoai/warehouse"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[12px] font-medium text-green hover:underline"
-        >
-          Repo &amp; panduan lengkap →
-        </a>
-      </div>
     </Dialog>
   );
 }
